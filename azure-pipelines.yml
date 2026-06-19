@@ -20,7 +20,7 @@ schedules:
     always: true
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: ubuntu-22.04
 
 variables:
   nodeVersion: "20.x"
