@@ -1,0 +1,35 @@
+{
+  "name": "advertiserflexautomation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:chromium": "playwright test --project=chromium",
+    "test:chromium:headed": "playwright test --project=chromium --headed --workers=1",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:slow": "playwright test --headed --project=chromium",
+    "report": "playwright show-report",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.45.3",
+    "@types/node": "^20.19.39",
+    "husky": "^8.0.3",
+    "prettier": "^3.0.3"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run format"
+    }
+  }
+}

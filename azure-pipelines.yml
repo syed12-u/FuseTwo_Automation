@@ -1,0 +1,83 @@
+trigger:
+  branches:
+    include:
+      - main
+      - master
+
+pr:
+  branches:
+    include:
+      - main
+      - master
+
+schedules:
+  - cron: "0 13 * * 1-5"
+    displayName: Weekday Playwright run
+    branches:
+      include:
+        - main
+        - master
+    always: true
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  nodeVersion: "20.x"
+
+steps:
+  - task: NodeTool@0
+    displayName: Use Node.js $(nodeVersion)
+    inputs:
+      versionSpec: $(nodeVersion)
+
+  - script: npm ci
+    displayName: Install npm dependencies
+
+  - script: npx playwright install --with-deps chromium
+    displayName: Install Playwright browsers
+
+  - script: |
+      cat > .env <<EOF
+      URL=$(URL)
+      HOME_URL=$(HOME_URL)
+      FO_USERNAME=$(FO_USERNAME)
+      FO_PASSWORD=$(FO_PASSWORD)
+      FLEXOFFERS_SIGNUP_URL=$(FLEXOFFERS_SIGNUP_URL)
+      CONTROL_USERNAME=$(CONTROL_USERNAME)
+      CONTROL_PASSWORD=$(CONTROL_PASSWORD)
+      BRIGHTDATA_HOST=$(BRIGHTDATA_HOST)
+      BRIGHTDATA_PORT=$(BRIGHTDATA_PORT)
+      BRIGHTDATA_USERNAME=$(BRIGHTDATA_USERNAME)
+      BRIGHTDATA_PASSWORD=$(BRIGHTDATA_PASSWORD)
+      EOF
+    displayName: Create runtime environment file
+
+  - script: npm run test:chromium
+    displayName: Run Playwright tests
+    env:
+      CI: "true"
+
+  - task: PublishTestResults@2
+    displayName: Publish JUnit test results
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: test-results/junit.xml
+      failTaskOnFailedTests: true
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish Playwright HTML report
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: playwright-report
+      artifact: playwright-report
+      publishLocation: pipeline
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish Playwright test artifacts
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: test-results
+      artifact: test-results
+      publishLocation: pipeline
