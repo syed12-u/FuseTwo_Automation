@@ -19,8 +19,11 @@ schedules:
         - master
     always: true
 
+# Self-hosted agent pool. The agent runs on a Windows machine inside the
+# Flexoffers network so it can reach the internal dev site (advertiser.dev.fusetwo.com -> 10.2.30.126),
+# which Microsoft-hosted cloud agents cannot resolve or route to.
 pool:
-  vmImage: ubuntu-22.04
+  name: Default
 
 variables:
   nodeVersion: "20.x"
@@ -34,24 +37,39 @@ steps:
   - script: npm ci
     displayName: Install npm dependencies
 
-  - script: npx playwright install --with-deps chromium
+  # No --with-deps on Windows; that flag installs Linux apt packages only.
+  - script: npx playwright install chromium
     displayName: Install Playwright browsers
 
-  - script: |
-      cat > .env <<EOF
-      URL=$(URL)
-      HOME_URL=$(HOME_URL)
-      FO_USERNAME=$(FO_USERNAME)
-      FO_PASSWORD=$(FO_PASSWORD)
-      FLEXOFFERS_SIGNUP_URL=$(FLEXOFFERS_SIGNUP_URL)
-      CONTROL_USERNAME=$(CONTROL_USERNAME)
-      CONTROL_PASSWORD=$(CONTROL_PASSWORD)
-      BRIGHTDATA_HOST=$(BRIGHTDATA_HOST)
-      BRIGHTDATA_PORT=$(BRIGHTDATA_PORT)
-      BRIGHTDATA_USERNAME=$(BRIGHTDATA_USERNAME)
-      BRIGHTDATA_PASSWORD=$(BRIGHTDATA_PASSWORD)
-      EOF
+  # Build .env on the agent. Secrets are mapped via env (Azure does not expand
+  # secret $(...) macros into inline scripts), then written with PowerShell.
+  - powershell: |
+      @"
+      URL=$env:URL
+      HOME_URL=$env:HOME_URL
+      FO_USERNAME=$env:FO_USERNAME
+      FO_PASSWORD=$env:FO_PASSWORD
+      FLEXOFFERS_SIGNUP_URL=$env:FLEXOFFERS_SIGNUP_URL
+      CONTROL_USERNAME=$env:CONTROL_USERNAME
+      CONTROL_PASSWORD=$env:CONTROL_PASSWORD
+      BRIGHTDATA_HOST=$env:BRIGHTDATA_HOST
+      BRIGHTDATA_PORT=$env:BRIGHTDATA_PORT
+      BRIGHTDATA_USERNAME=$env:BRIGHTDATA_USERNAME
+      BRIGHTDATA_PASSWORD=$env:BRIGHTDATA_PASSWORD
+      "@ | Out-File -FilePath .env -Encoding ascii
     displayName: Create runtime environment file
+    env:
+      URL: $(URL)
+      HOME_URL: $(HOME_URL)
+      FO_USERNAME: $(FO_USERNAME)
+      FO_PASSWORD: $(FO_PASSWORD)
+      FLEXOFFERS_SIGNUP_URL: $(FLEXOFFERS_SIGNUP_URL)
+      CONTROL_USERNAME: $(CONTROL_USERNAME)
+      CONTROL_PASSWORD: $(CONTROL_PASSWORD)
+      BRIGHTDATA_HOST: $(BRIGHTDATA_HOST)
+      BRIGHTDATA_PORT: $(BRIGHTDATA_PORT)
+      BRIGHTDATA_USERNAME: $(BRIGHTDATA_USERNAME)
+      BRIGHTDATA_PASSWORD: $(BRIGHTDATA_PASSWORD)
 
   - script: npm run test:chromium
     displayName: Run Playwright tests
