@@ -11,8 +11,8 @@ pr:
       - master
 
 schedules:
-  - cron: "0 13 * * 1-5"
-    displayName: Weekday Playwright run
+  - cron: "0 13 * * *"
+    displayName: Daily Playwright run
     branches:
       include:
         - main
@@ -71,8 +71,11 @@ steps:
       BRIGHTDATA_USERNAME: $(BRIGHTDATA_USERNAME)
       BRIGHTDATA_PASSWORD: $(BRIGHTDATA_PASSWORD)
 
-  - script: npm run test:chromium
-    displayName: Run Playwright tests
+  # Run all Playwright projects (setup + chromium + geo-login), not just chromium.
+  # Files excluded via testIgnore in playwright.config.ts still won't run until
+  # their known issues are fixed (signup CAPTCHA, message-center login, etc.).
+  - script: npx playwright test
+    displayName: Run Playwright tests (all projects)
     env:
       CI: "true"
 
