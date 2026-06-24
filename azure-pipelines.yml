@@ -71,21 +71,29 @@ steps:
       BRIGHTDATA_USERNAME: $(BRIGHTDATA_USERNAME)
       BRIGHTDATA_PASSWORD: $(BRIGHTDATA_PASSWORD)
 
-  # Run all Playwright projects (setup + chromium + geo-login), not just chromium.
+  # Run all Playwright projects (setup + chromium + geo-login) in a single
+  # invocation. A single run is deliberate: Playwright wipes the test-results/
+  # output dir at the start of every run, so two separate runs would erase each
+  # other's artifacts and junit. continueOnError lets the run report failures
+  # without reddening the build here -- the gate step below decides red/green.
   # Files excluded via testIgnore in playwright.config.ts still won't run until
   # their known issues are fixed (signup CAPTCHA, message-center login, etc.).
   - script: npx playwright test
     displayName: Run Playwright tests (all projects)
+    continueOnError: true
     env:
       CI: "true"
 
+  # Publishes ALL results (including geo-login) to the Tests tab for visibility.
+  # failTaskOnFailedTests is false here because the gate step below is what
+  # actually fails the build -- and only on functional (non-diagnostic) failures.
   - task: PublishTestResults@2
     displayName: Publish JUnit test results
     condition: succeededOrFailed()
     inputs:
       testResultsFormat: JUnit
       testResultsFiles: test-results/junit.xml
-      failTaskOnFailedTests: true
+      failTaskOnFailedTests: false
 
   - task: PublishPipelineArtifact@1
     displayName: Publish Playwright HTML report
@@ -102,3 +110,38 @@ steps:
       targetPath: test-results
       artifact: test-results
       publishLocation: pipeline
+
+  # Final red/green decision. The geo-login project tests are diagnostic: they
+  # FAIL on purpose when the dev site returns a 502 through the BrightData proxy,
+  # producing the 502 JSON reports published above. Those must NOT red the build.
+  # This step reds the build only when a NON-diagnostic (functional) test failed.
+  # Transient flakiness is already absorbed by retries:2 in playwright.config.ts.
+  - powershell: |
+      $junit = 'test-results/junit.xml'
+      if (-not (Test-Path $junit)) {
+        Write-Host "##vso[task.logissue type=error]No JUnit results at $junit - tests did not run."
+        exit 1
+      }
+      [xml]$results = Get-Content $junit
+      $cases = $results.SelectNodes('//testcase')
+      $blocking = @()
+      foreach ($c in $cases) {
+        # Check for child <failure>/<error> nodes directly. Do NOT use $c.failure:
+        # an empty <failure/> exposes its (blank) inner text, which reads as falsy.
+        if ($c.SelectNodes('failure').Count -eq 0 -and $c.SelectNodes('error').Count -eq 0) { continue }
+        $id = "$($c.classname) > $($c.name)"
+        # Geo-login diagnostics: matched by their describe/title text. Non-gating.
+        if ($id -match 'BrightData|Geo-Location') {
+          Write-Host "Ignoring non-gating geo-login diagnostic failure: $id"
+        } else {
+          $blocking += $id
+        }
+      }
+      if ($blocking.Count -gt 0) {
+        Write-Host "##vso[task.logissue type=error]$($blocking.Count) functional test failure(s) - failing the build:"
+        $blocking | ForEach-Object { Write-Host "  - $_" }
+        exit 1
+      }
+      Write-Host "No blocking functional failures. Geo-login diagnostics (if any) are non-gating."
+    displayName: Gate build on functional failures (geo-login excluded)
+    condition: succeededOrFailed()
