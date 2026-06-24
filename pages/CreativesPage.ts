@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 import BasePage from './BasePage';
 
 export default class CreativesPage extends BasePage {
@@ -70,14 +70,31 @@ export default class CreativesPage extends BasePage {
     }
 
     // ===== Actions =====
-    async createTextLink(programName: string, text: string) {
-        await this.addTextLinkBtn.click();
-
+    // Selecting the program triggers an async load of its campaign list, and
+    // the campaign dropdown can be briefly covered by the closing program
+    // overlay. Open the dropdown only when no listbox is showing (so we never
+    // toggle it shut) and retry until the campaign option appears, instead of
+    // clicking blindly and timing out. This was the source of testAddTextLink
+    // flaking on the slower CI agent.
+    private async selectProgramAndCampaign(programName: string) {
         await this.programDropdown.click();
         await this.programOption(programName).click();
 
-        await this.campaignDropdown.click();
-        await this.campaignOption(programName).click();
+        const option = this.campaignOption(programName);
+        const listbox = this.page.getByRole('listbox').first();
+        await expect(async () => {
+            if (!(await listbox.isVisible().catch(() => false))) {
+                await this.campaignDropdown.click();
+            }
+            await expect(option).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 60000 });
+        await option.click();
+    }
+
+    async createTextLink(programName: string, text: string) {
+        await this.addTextLinkBtn.click();
+
+        await this.selectProgramAndCampaign(programName);
 
         await this.textInput.fill(text);
 
@@ -96,11 +113,7 @@ export default class CreativesPage extends BasePage {
 
         await this.addBannerBtn.click();
 
-        await this.programDropdown.click();
-        await this.programOption(programName).click();
-
-        await this.campaignDropdown.click();
-        await this.campaignOption(programName).click();
+        await this.selectProgramAndCampaign(programName);
 
         await this.imageTitleInput.fill(imageTitle);
         await this.imageAltInput.fill(imageAlt);
