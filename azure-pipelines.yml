@@ -97,6 +97,42 @@ steps:
     displayName: Network preflight diagnostics (advertiser.dev.fusetwo.com)
     continueOnError: true
 
+  # Workaround for net::ERR_NAME_NOT_RESOLVED: the agent has both an internal
+  # NIC (DNS resolves the dev host) and a Wi-Fi NIC (public DNS that cannot),
+  # so resolution is intermittent. Pin the documented internal IP via the hosts
+  # file so the system resolver (and Chromium) always finds it. Idempotent: the
+  # self-hosted agent's hosts file persists between runs, so we add the entry
+  # only if it's missing. continueOnError so a permissions issue stays visible
+  # (the preflight + test steps still show the real DNS state) without blocking.
+  - powershell: |
+      $ErrorActionPreference = 'Stop'
+      $targetHost = 'advertiser.dev.fusetwo.com'
+      $targetIp   = '10.2.30.126'
+      $hostsPath  = "$env:SystemRoot\System32\drivers\etc\hosts"
+      $existing = @(Get-Content $hostsPath -ErrorAction SilentlyContinue |
+                    Where-Object { $_ -match "\b$([regex]::Escape($targetHost))\b" })
+      if ($existing.Count -gt 0) {
+        Write-Host "hosts already maps $targetHost:"
+        $existing | ForEach-Object { Write-Host "  $_" }
+      } else {
+        try {
+          Add-Content -Path $hostsPath -Value "`r`n$targetIp`t$targetHost" -ErrorAction Stop
+          Write-Host "Added hosts entry: $targetIp $targetHost"
+        } catch {
+          Write-Host "##vso[task.logissue type=warning]Could not write hosts file (needs admin on the agent): $($_.Exception.Message)"
+        }
+      }
+      # Verify via the system resolver, which honors the hosts file (Resolve-DnsName
+      # queries DNS directly and may not reflect it).
+      try {
+        $addrs = [System.Net.Dns]::GetHostAddresses($targetHost) | ForEach-Object { $_.IPAddressToString }
+        Write-Host "GetHostAddresses($targetHost) -> $($addrs -join ', ')"
+      } catch {
+        Write-Host "##vso[task.logissue type=warning]$targetHost still does not resolve: $($_.Exception.Message)"
+      }
+    displayName: Pin dev host in hosts file (DNS workaround)
+    continueOnError: true
+
   # Run all Playwright projects (setup + chromium + geo-login) in a single
   # invocation. A single run is deliberate: Playwright wipes the test-results/
   # output dir at the start of every run, so two separate runs would erase each
