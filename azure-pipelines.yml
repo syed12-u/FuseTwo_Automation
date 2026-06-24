@@ -29,10 +29,10 @@ variables:
   nodeVersion: "20.x"
 
 steps:
-  - task: NodeTool@0
+  - task: UseNode@1
     displayName: Use Node.js $(nodeVersion)
     inputs:
-      versionSpec: $(nodeVersion)
+      version: $(nodeVersion)
 
   - script: npm ci
     displayName: Install npm dependencies
