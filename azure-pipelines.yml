@@ -71,6 +71,32 @@ steps:
       BRIGHTDATA_USERNAME: $(BRIGHTDATA_USERNAME)
       BRIGHTDATA_PASSWORD: $(BRIGHTDATA_PASSWORD)
 
+  # Network preflight: the setup test fails with net::ERR_NAME_NOT_RESOLVED for
+  # advertiser.dev.fusetwo.com, meaning this agent can't resolve the internal dev
+  # host. This step is diagnostic only (continueOnError) -- it prints which agent
+  # ran, its DNS config, whether the host resolves, and whether the documented
+  # internal IP (10.2.30.126) is reachable on 443, so we can pinpoint the fix.
+  - powershell: |
+      $ErrorActionPreference = 'Continue'
+      $targetHost = 'advertiser.dev.fusetwo.com'
+      $targetIp   = '10.2.30.126'
+      Write-Host "=== Agent ==="
+      Write-Host "Agent.Name : $env:AGENT_NAME"
+      Write-Host "Hostname   : $env:COMPUTERNAME"
+      Write-Host "`n=== DNS servers ==="
+      Get-DnsClientServerAddress -AddressFamily IPv4 | Format-Table -AutoSize | Out-String | Write-Host
+      Write-Host "=== nslookup $targetHost ==="
+      cmd /c "nslookup $targetHost" 2>&1 | Out-String | Write-Host
+      Write-Host "=== Resolve-DnsName $targetHost ==="
+      try { Resolve-DnsName $targetHost -ErrorAction Stop | Format-Table -AutoSize | Out-String | Write-Host }
+      catch { Write-Host "Resolve-DnsName failed: $($_.Exception.Message)" }
+      Write-Host "=== TCP 443 to hostname $targetHost ==="
+      Test-NetConnection -ComputerName $targetHost -Port 443 -WarningAction SilentlyContinue | Format-List | Out-String | Write-Host
+      Write-Host "=== TCP 443 to documented IP $targetIp ==="
+      Test-NetConnection -ComputerName $targetIp -Port 443 -WarningAction SilentlyContinue | Format-List | Out-String | Write-Host
+    displayName: Network preflight diagnostics (advertiser.dev.fusetwo.com)
+    continueOnError: true
+
   # Run all Playwright projects (setup + chromium + geo-login) in a single
   # invocation. A single run is deliberate: Playwright wipes the test-results/
   # output dir at the start of every run, so two separate runs would erase each
