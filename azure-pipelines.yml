@@ -111,7 +111,7 @@ steps:
       $tcp = Test-NetConnection -ComputerName $connectionTarget -Port 443 -WarningAction SilentlyContinue
       $tcp | Format-List | Out-String | Write-Host
       if (-not $tcp.TcpTestSucceeded) {
-        Write-Host "##vso[task.logissue type=error]Agent cannot reach $connectionTarget:443. Run this pipeline on a Flexoffers network agent, or update CI_DEV_HOST_IP to the current reachable IP."
+        Write-Host "##vso[task.logissue type=error]Agent cannot reach ${connectionTarget}:443. Run this pipeline on a Flexoffers network agent, or update CI_DEV_HOST_IP to the current reachable IP."
         exit 1
       }
     displayName: Network preflight diagnostics (advertiser.dev.fusetwo.com)
