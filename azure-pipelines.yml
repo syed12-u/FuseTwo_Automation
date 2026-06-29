@@ -62,6 +62,7 @@ steps:
       BRIGHTDATA_PORT=$env:BRIGHTDATA_PORT
       BRIGHTDATA_USERNAME=$env:BRIGHTDATA_USERNAME
       BRIGHTDATA_PASSWORD=$env:BRIGHTDATA_PASSWORD
+      CI_DEV_HOST_IP=$env:CI_DEV_HOST_IP
       "@ | Out-File -FilePath .env -Encoding ascii
     displayName: Create runtime environment file
     env:
@@ -76,39 +77,40 @@ steps:
       BRIGHTDATA_PORT: $(BRIGHTDATA_PORT)
       BRIGHTDATA_USERNAME: $(BRIGHTDATA_USERNAME)
       BRIGHTDATA_PASSWORD: $(BRIGHTDATA_PASSWORD)
+      CI_DEV_HOST_IP: $(CI_DEV_HOST_IP)
 
-  # Network preflight: the setup test fails with net::ERR_NAME_NOT_RESOLVED for
-  # advertiser.dev.fusetwo.com, meaning this agent can't resolve the internal dev
-  # host. This step is diagnostic only (continueOnError) -- it prints which agent
-  # ran, its DNS config, whether the host resolves, and whether the documented
-  # internal IP (10.2.30.126) is reachable on 443, so we can pinpoint the fix.
+  # Network preflight: fail early when the agent cannot reach the internal dev
+  # host. If CI_DEV_HOST_IP is set, Playwright maps advertiser.dev.fusetwo.com to
+  # that IP in Chromium; otherwise the browser uses normal agent DNS.
   - powershell: |
-      $ErrorActionPreference = 'Continue'
+      $ErrorActionPreference = 'Stop'
       $targetHost = 'advertiser.dev.fusetwo.com'
-      $targetIp   = '10.2.30.126'
+      $overrideIp = $env:CI_DEV_HOST_IP
+      $connectionTarget = if ([string]::IsNullOrWhiteSpace($overrideIp) -or $overrideIp -like '$(*') { $targetHost } else { $overrideIp }
       Write-Host "=== Agent ==="
       Write-Host "Agent.Name : $env:AGENT_NAME"
       Write-Host "Hostname   : $env:COMPUTERNAME"
+      Write-Host "CI_DEV_HOST_IP: $overrideIp"
       Write-Host "`n=== DNS servers ==="
-      Get-DnsClientServerAddress -AddressFamily IPv4 | Format-Table -AutoSize | Out-String | Write-Host
+      try { Get-DnsClientServerAddress -AddressFamily IPv4 | Format-Table -AutoSize | Out-String | Write-Host }
+      catch { Write-Host "DNS server listing unavailable: $($_.Exception.Message)" }
       Write-Host "=== nslookup $targetHost ==="
       cmd /c "nslookup $targetHost" 2>&1 | Out-String | Write-Host
       Write-Host "=== Resolve-DnsName $targetHost ==="
       try { Resolve-DnsName $targetHost -ErrorAction Stop | Format-Table -AutoSize | Out-String | Write-Host }
       catch { Write-Host "Resolve-DnsName failed: $($_.Exception.Message)" }
-      Write-Host "=== TCP 443 to hostname $targetHost ==="
-      Test-NetConnection -ComputerName $targetHost -Port 443 -WarningAction SilentlyContinue | Format-List | Out-String | Write-Host
-      Write-Host "=== TCP 443 to documented IP $targetIp ==="
-      Test-NetConnection -ComputerName $targetIp -Port 443 -WarningAction SilentlyContinue | Format-List | Out-String | Write-Host
+      Write-Host "=== TCP 443 to browser target $connectionTarget ==="
+      $tcp = Test-NetConnection -ComputerName $connectionTarget -Port 443 -WarningAction SilentlyContinue
+      $tcp | Format-List | Out-String | Write-Host
+      if (-not $tcp.TcpTestSucceeded) {
+        Write-Host "##vso[task.logissue type=error]Agent cannot reach $connectionTarget:443. Run this pipeline on a Flexoffers network agent, or set CI_DEV_HOST_IP only to a reachable current IP."
+        exit 1
+      }
     displayName: Network preflight diagnostics (advertiser.dev.fusetwo.com)
-    continueOnError: true
 
-  # NOTE: the DNS workaround for net::ERR_NAME_NOT_RESOLVED is now done in
-  # playwright.config.ts via Chromium's --host-resolver-rules (CI-only), which
-  # maps advertiser.dev.fusetwo.com -> 10.2.30.126 inside the browser. That needs
-  # no admin and no hosts-file edit (the agent service can't write hosts), so the
-  # previous hosts-file step was removed. The preflight step above still reports
-  # whether 10.2.30.126:443 is reachable from the agent.
+  # NOTE: the DNS workaround for net::ERR_NAME_NOT_RESOLVED is optional now.
+  # Set CI_DEV_HOST_IP in the Azure pipeline only when DNS is broken and that IP
+  # is confirmed reachable from the agent. Leaving it unset uses normal DNS.
 
   # Run all Playwright projects (setup + chromium + geo-login) in a single
   # invocation. A single run is deliberate: Playwright wipes the test-results/

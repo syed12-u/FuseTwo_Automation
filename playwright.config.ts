@@ -14,14 +14,15 @@ dotenvConfig();
  * See https://playwright.dev/docs/test-configuration.
  */
 
-// The self-hosted CI agent intermittently fails to resolve the internal dev host
-// (net::ERR_NAME_NOT_RESOLVED) because its Wi-Fi NIC uses public DNS. Tell Chromium
-// to map the hostname straight to the documented internal IP, bypassing OS DNS with
-// no admin / hosts-file edit required. CI-only so local dev (where DNS works) is
-// unaffected. TLS still validates against the hostname (SNI is unchanged).
-const ciBrowserArgs = process.env.CI
-  ? ['--host-resolver-rules=MAP advertiser.dev.fusetwo.com 10.2.30.126']
-  : [];
+// Optional CI-only DNS override. Leave CI_DEV_HOST_IP unset when the agent can
+// resolve advertiser.dev.fusetwo.com normally. Set it only when the agent's DNS
+// is broken and the override IP is confirmed reachable from that agent.
+const ciDevHostIp = process.env.CI_DEV_HOST_IP;
+const hasCiDevHostIp = !!ciDevHostIp && !ciDevHostIp.startsWith('$(');
+const ciBrowserArgs =
+  process.env.CI && hasCiDevHostIp
+    ? [`--host-resolver-rules=MAP advertiser.dev.fusetwo.com ${ciDevHostIp}`]
+    : [];
 
 export default defineConfig({
   timeout: 2 * 60 * 1000,
