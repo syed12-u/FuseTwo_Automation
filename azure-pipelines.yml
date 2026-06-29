@@ -37,9 +37,15 @@ steps:
   - script: npm ci
     displayName: Install npm dependencies
 
-  # No --with-deps on Windows; that flag installs Linux apt packages only.
+  # Linux hosted agents need Playwright's system packages. Windows self-hosted
+  # agents do not support --with-deps, so keep the install split by OS.
+  - script: npx playwright install --with-deps chromium
+    displayName: Install Playwright browsers and Linux dependencies
+    condition: eq(variables['Agent.OS'], 'Linux')
+
   - script: npx playwright install chromium
     displayName: Install Playwright browsers
+    condition: ne(variables['Agent.OS'], 'Linux')
 
   # Build .env on the agent. Secrets are mapped via env (Azure does not expand
   # secret $(...) macros into inline scripts), then written with PowerShell.
@@ -117,6 +123,14 @@ steps:
     env:
       CI: "true"
 
+  # If setup/install fails before Playwright creates these folders, the publish
+  # steps should not add extra red herrings to the run summary.
+  - powershell: |
+      New-Item -ItemType Directory -Force -Path playwright-report | Out-Null
+      New-Item -ItemType Directory -Force -Path test-results | Out-Null
+    displayName: Ensure artifact directories exist
+    condition: succeededOrFailed()
+
   # Publishes ALL results (including geo-login) to the Tests tab for visibility.
   # failTaskOnFailedTests is false here because the gate step below is what
   # actually fails the build -- and only on functional (non-diagnostic) failures.
@@ -126,6 +140,7 @@ steps:
     inputs:
       testResultsFormat: JUnit
       testResultsFiles: test-results/junit.xml
+      failTaskOnMissingResultsFile: false
       failTaskOnFailedTests: false
 
   - task: PublishPipelineArtifact@1
