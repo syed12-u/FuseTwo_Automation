@@ -27,6 +27,10 @@ pool:
 
 variables:
   nodeVersion: "20.x"
+  # DEV-FT-BUILD01 currently cannot resolve advertiser.dev.fusetwo.com via
+  # corp DNS, so Chromium maps the host to this IP during CI. The preflight step
+  # validates the IP is reachable before Playwright runs.
+  CI_DEV_HOST_IP: "10.2.30.126"
 
 steps:
   - task: UseNode@1
@@ -80,8 +84,8 @@ steps:
       CI_DEV_HOST_IP: $(CI_DEV_HOST_IP)
 
   # Network preflight: fail early when the agent cannot reach the internal dev
-  # host. If CI_DEV_HOST_IP is set, Playwright maps advertiser.dev.fusetwo.com to
-  # that IP in Chromium; otherwise the browser uses normal agent DNS.
+  # host. CI_DEV_HOST_IP maps advertiser.dev.fusetwo.com inside Chromium when
+  # agent DNS cannot resolve the internal dev host.
   - powershell: |
       $ErrorActionPreference = 'Stop'
       $targetHost = 'advertiser.dev.fusetwo.com'
@@ -95,7 +99,11 @@ steps:
       try { Get-DnsClientServerAddress -AddressFamily IPv4 | Format-Table -AutoSize | Out-String | Write-Host }
       catch { Write-Host "DNS server listing unavailable: $($_.Exception.Message)" }
       Write-Host "=== nslookup $targetHost ==="
+      $previousErrorActionPreference = $ErrorActionPreference
+      $ErrorActionPreference = 'Continue'
       cmd /c "nslookup $targetHost" 2>&1 | Out-String | Write-Host
+      $ErrorActionPreference = $previousErrorActionPreference
+      $global:LASTEXITCODE = 0
       Write-Host "=== Resolve-DnsName $targetHost ==="
       try { Resolve-DnsName $targetHost -ErrorAction Stop | Format-Table -AutoSize | Out-String | Write-Host }
       catch { Write-Host "Resolve-DnsName failed: $($_.Exception.Message)" }
@@ -103,14 +111,13 @@ steps:
       $tcp = Test-NetConnection -ComputerName $connectionTarget -Port 443 -WarningAction SilentlyContinue
       $tcp | Format-List | Out-String | Write-Host
       if (-not $tcp.TcpTestSucceeded) {
-        Write-Host "##vso[task.logissue type=error]Agent cannot reach $connectionTarget:443. Run this pipeline on a Flexoffers network agent, or set CI_DEV_HOST_IP only to a reachable current IP."
+        Write-Host "##vso[task.logissue type=error]Agent cannot reach $connectionTarget:443. Run this pipeline on a Flexoffers network agent, or update CI_DEV_HOST_IP to the current reachable IP."
         exit 1
       }
     displayName: Network preflight diagnostics (advertiser.dev.fusetwo.com)
 
-  # NOTE: the DNS workaround for net::ERR_NAME_NOT_RESOLVED is optional now.
-  # Set CI_DEV_HOST_IP in the Azure pipeline only when DNS is broken and that IP
-  # is confirmed reachable from the agent. Leaving it unset uses normal DNS.
+  # NOTE: the DNS workaround for net::ERR_NAME_NOT_RESOLVED is controlled by
+  # CI_DEV_HOST_IP. Update that variable if the dev host IP changes.
 
   # Run all Playwright projects (setup + chromium + geo-login) in a single
   # invocation. A single run is deliberate: Playwright wipes the test-results/
