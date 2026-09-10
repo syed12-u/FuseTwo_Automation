@@ -4,7 +4,9 @@ parameters:
   - name: testEnv
     displayName: Target environment
     type: string
-    default: dev
+    # Default is staging while the dev host is down (its TLS cert CN is invalid
+    # and the login page does not load). Switch back to dev once it is healthy.
+    default: staging
     values:
       - dev
       - staging
@@ -140,6 +142,9 @@ steps:
         exit 1
       }
     displayName: Network preflight diagnostics (advertiser.dev.fusetwo.com)
+    # Only gates dev runs -- the dev-host check is irrelevant when targeting
+    # staging or prod, and must not fail those builds.
+    condition: eq(variables['TEST_ENV'], 'dev')
 
   # NOTE: the DNS workaround for net::ERR_NAME_NOT_RESOLVED is controlled by
   # CI_DEV_HOST_IP. Update that variable if the dev host IP changes.

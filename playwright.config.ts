@@ -92,8 +92,10 @@ export default defineConfig({
   projects: [
     { name: "setup", testMatch: /.*\.setup\.ts/ },
 
-    /* Day-to-day run. Suites listed in testIgnore need dedicated data or a
-       proxy and are exercised by their own npm scripts instead. */
+    /* Day-to-day run. Suites listed in testIgnore need dedicated data, a proxy,
+       Windows-SSO into management, or a configured mailbox -- none of which the
+       CI agent has -- so they are exercised by their own npm scripts locally
+       instead of gating the build. */
     {
       name: "chromium",
       testIgnore: [
@@ -102,6 +104,17 @@ export default defineConfig({
         /Accounting[\\/].*\.spec\.ts/,
         /MessageCenter[\\/].*\.spec\.ts/,
         /Reporting[\\/]testReporting\.spec\.ts/,
+        // Special scenario suites -- run via their own npm scripts, not the gate.
+        /ExecutiveRegression[\\/].*\.spec\.ts/,
+        /MeetingVideoRegression[\\/].*\.spec\.ts/,
+        /TicketVerification[\\/].*\.spec\.ts/,
+        // Need management Windows-SSO and/or a real mailbox -- not available on
+        // the CI agent (it runs as a service account, no Outlook). Run locally.
+        /Onboarding[\\/]provisionApprovedAccount\.spec\.ts/,
+        /Onboarding[\\/]testEmailVerification\.spec\.ts/,
+        /Onboarding[\\/]testStatusEmail\.spec\.ts/,
+        /Onboarding[\\/]testManagementAdvertiserCrud\.spec\.ts/,
+        /Onboarding[\\/]testOnboardingLifecycle\.spec\.ts/,
       ],
       grepInvert: excludeTagPattern,
       use: { ...devices["Desktop Chrome"] },
