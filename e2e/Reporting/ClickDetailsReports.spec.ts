@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test';
 import ClicksDetailsPage from '../../pages/ClickDetailsPage';
 import { navigateToHome } from '../../utility/navigationUtils';
+import { AUTH_FILE } from '../../config/environment';
 
 // ── Test data ─────────────────────────────────────────────────────────────────
 const ALT_FILTER_VALUE = 'test';
 
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe('Reporting - Clicks Detailed', () => {
-    test.use({ storageState: 'playwright/.auth/authentication.json' });
+    test.use({ storageState: AUTH_FILE });
 
     // ─────────────────────────────────────────────────────────────────────────
     // TEST 1 — Page loads with table and export button

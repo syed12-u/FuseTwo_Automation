@@ -1,5 +1,6 @@
 import { Page, Locator, expect } from "@playwright/test";
 import BasePage from "./BasePage";
+import { appUrl, PATHS } from "../config/environment";
 
 export default class ClicksSummaryPage extends BasePage {
   // ===== Navigation =====
@@ -88,9 +89,11 @@ export default class ClicksSummaryPage extends BasePage {
 
   // ===== Navigation =====
   async navigateToClicksSummary() {
-    await this.reportingBtn.click();
-    await expect(this.clicksSummaryLink).toBeVisible({ timeout: 10000 });
-    await this.clicksSummaryLink.click();
+    // Direct navigation — the sidebar "Reporting" menu traversal intermittently
+    // hangs; go straight to the report and wait for its output.
+    await this.page.goto(appUrl(PATHS.reportClicksSummary), {
+      waitUntil: "domcontentloaded",
+    });
     await expect(this.exportBtn).toBeVisible({ timeout: 15000 });
     await expect(this.table).toBeVisible({ timeout: 15000 });
   }

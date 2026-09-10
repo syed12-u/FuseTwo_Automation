@@ -4,9 +4,10 @@ import ControlLoginPage from '../../pages/ControlLoginPage';
 import PendingEmailsPage from '../../pages/PendingEmailsPage';
 import { navigateToHome } from '../../utility/navigationUtils';
 import { CONTROL_SITE_URL, CONTROL_ADVERTISER_NAME } from '../../fixtures/testConstants';
+import { AUTH_FILE } from '../../config/environment';
 
 test.describe('Message Center Flow', () => {
-    test.use({ storageState: 'playwright/.auth/authentication.json' });
+    test.use({ storageState: AUTH_FILE });
 
     test('Verify user can create, send, and approve a message', async ({ page }) => {
 

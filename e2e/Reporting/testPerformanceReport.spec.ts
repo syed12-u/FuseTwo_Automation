@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
 import PerformanceReportPage from "../../pages/PerformanceReportPage";
 import { navigateToHome } from "../../utility/navigationUtils";
+import { AUTH_FILE } from '../../config/environment';
 
 test.describe("Reporting - Performance Report", () => {
-  test.use({ storageState: "playwright/.auth/authentication.json" });
+  test.use({ storageState: AUTH_FILE });
 
   // ─────────────────────────────────────────────────────────────────────────
   // TEST 1 — Custom Date Range Report (Monthly breakdown)

@@ -1,0 +1,10 @@
+{
+  "id": "1062627",
+  "statusBefore": "Pending",
+  "statusChangedTo": "Collect Payment",
+  "emailDialogAppeared": true,
+  "emailToField": "syed.shah+prodtestmtit7q2s@flexoffers.com",
+  "templateSent": "Approval Login Information",
+  "dialogClosedAfterSend": true,
+  "statusEmailDelivered": false
+}

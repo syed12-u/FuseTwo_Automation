@@ -1,0 +1,74 @@
+{
+  "email": "syed.shah+stagemt6wljzv@flexoffers.com",
+  "company": "Stage capture mt6wljzv",
+  "id": "1062756",
+  "results": [
+    {
+      "stage": "0-unverified",
+      "url": "https://advertiser.dev.fusetwo.com/signin",
+      "file": "docs/stage-screens/0-unverified.png",
+      "heading": [
+        "Advertiser Platform"
+      ],
+      "body": "Advertiser Platform\nThis account needs to be verified. If you cannot find your verification email, please check your spam folder for an email from FuseTwo. If you would like us to resend the verification email, please click here to request "
+    },
+    {
+      "stage": "1-Pending",
+      "url": "https://advertiser.dev.fusetwo.com/account/pending-account",
+      "file": "docs/stage-screens/1-Pending.png",
+      "heading": [],
+      "body": "Your application is currently being reviewed. | We want to thank you for taking the time to complete the application and for considering FuseTwo for your advertising needs. Please allow up to 3 business days for a response from our team wit"
+    },
+    {
+      "stage": "2-Collect Payment",
+      "url": "https://advertiser.dev.fusetwo.com/account/collect-payment?user=syed.shah+stagemt6wljzv@flexoffers.com",
+      "file": "docs/stage-screens/2-CollectPayment.png",
+      "heading": [
+        "Pricing Schedule"
+      ],
+      "body": "You Have Been Approved | Congratulations! | Advertiser Agreement - Terms and Conditions | The Advertiser Agreement (referred to as Agreement) along with the terms and conditions under which FuseTwo.com, LLC. (referred to as FuseTwo.com /  T"
+    },
+    {
+      "stage": "3-Initial Setup",
+      "url": "https://advertiser.dev.fusetwo.com/app/settings/advertisersetup",
+      "file": "docs/stage-screens/3-InitialSetup.png",
+      "heading": [
+        "Terms and ConditionsTo continue, you must accept the terms of this agreement. Please feel free to contact us with any questions."
+      ],
+      "body": "Dashboard\nPrograms\nPrograms\nCampaigns\nCreatives\nCoupons & Offers\nProducts\nPublishers\nPublisher List\nFind Publishers\nMessage Center\nPrivate Offers\nDaily Budget\nAccounting\nBilling Information\nReconcile Sales\nNon-Comm Sales\nAccount Balance\nRep"
+    },
+    {
+      "stage": "4-Follow Up",
+      "url": "https://advertiser.dev.fusetwo.com/account/pending-account",
+      "file": "docs/stage-screens/4-FollowUp.png",
+      "heading": [],
+      "body": "Your application is currently being reviewed. | We want to thank you for taking the time to complete the application and for considering FuseTwo for your advertising needs. Please allow up to 3 business days for a response from our team wit"
+    },
+    {
+      "stage": "5-Approved",
+      "url": "https://advertiser.dev.fusetwo.com/app/dashboard",
+      "file": "docs/stage-screens/5-Approved.png",
+      "heading": [
+        "Approved0",
+        "Pending0",
+        "Declined0",
+        "Deactivated0"
+      ],
+      "body": "Dashboard\nPrograms\nPrograms\nCampaigns\nCreatives\nCoupons & Offers\nProducts\nPublishers\nPublisher List\nFind Publishers\nMessage Center\nPrivate Offers\nDaily Budget\nAccounting\nBilling Information\nReconcile Sales\nNon-Comm Sales\nAccount Balance\nRep"
+    },
+    {
+      "stage": "6-Deactivated",
+      "url": "https://advertiser.dev.fusetwo.com/account/deactivated-account",
+      "file": "docs/stage-screens/6-Deactivated.png",
+      "heading": [],
+      "body": "Dear FuseTwo Advertiser | We regret to inform you that your FuseTwo account has been deactivated. This is most likely because your website no longer meets our standards. If you would like more information as to why your account has been dea"
+    },
+    {
+      "stage": "7-Declined",
+      "url": "https://advertiser.dev.fusetwo.com/account/declined-account",
+      "file": "docs/stage-screens/7-Declined.png",
+      "heading": [],
+      "body": "Thank you for applying to our network to become an advertiser of FuseTwo. | There are a number of set requirements in order to be considered for our network. Due to the strict quality network control and publisher base of our network, the p"
+    }
+  ]
+}

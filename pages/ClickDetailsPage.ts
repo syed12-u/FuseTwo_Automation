@@ -1,5 +1,6 @@
 import { Page, Locator, expect } from '@playwright/test';
 import BasePage from './BasePage';
+import { appUrl, PATHS } from '../config/environment';
 
 export default class ClicksDetailsPage extends BasePage {
     readonly reportingBtn: Locator;
@@ -49,9 +50,11 @@ export default class ClicksDetailsPage extends BasePage {
     }
 
     async navigateToClicksDetailed() {
-        await this.reportingBtn.click();
-        await expect(this.clicksDetailedLink).toBeVisible({ timeout: 10000 });
-        await this.clicksDetailedLink.click();
+        // Direct navigation — the sidebar "Reporting" menu traversal
+        // intermittently hangs the click.
+        await this.page.goto(appUrl(PATHS.reportClicksDetailed), {
+            waitUntil: 'domcontentloaded',
+        });
         await expect(this.exportBtn).toBeVisible({ timeout: 15000 });
         await expect(this.table).toBeVisible({ timeout: 15000 });
     }

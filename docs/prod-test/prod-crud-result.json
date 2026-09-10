@@ -1,0 +1,19 @@
+{
+  "id": "1062627",
+  "ops": {
+    "websiteUpdate": {
+      "set": "https://syedtest-prodedit-1788281902723.com",
+      "readBack": "https://syedtest-prodedit-1788281902723.com",
+      "persisted": true
+    },
+    "cityUpdate": {
+      "set": "ProdCity29572",
+      "readBack": "ProdCity29572",
+      "persisted": true
+    },
+    "addNote": {
+      "text": "QA prod note 1788281956471",
+      "submitted": true
+    }
+  }
+}

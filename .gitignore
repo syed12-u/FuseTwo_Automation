@@ -1,5 +1,11 @@
 .env
+.env.*.local
 node_modules/
 playwright-report/
 test-results/
 playwright/.auth/
+
+# Local session / tooling and large local-only artifacts (not for the repo)
+.claude/
+.codex-video-review/
+docs/demo-videos/

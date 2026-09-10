@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import CouponsOffersPage from '../../pages/CouponsOffersPage';
 import { navigateToHome } from '../../utility/navigationUtils';
+import { AUTH_FILE } from '../../config/environment';
 import {
   COUPON_CODE_PREFIX,
   COUPON_CREATE_SUCCESS_MESSAGE,
@@ -15,12 +16,14 @@ import {
 } from '../../fixtures/testConstants';
 
 test.describe('Coupons & Offers Flow', () => {
-  test.use({ storageState: 'playwright/.auth/authentication.json' });
+  test.use({ storageState: AUTH_FILE });
 
-  test.skip(
-    'Create, update, and toggle coupon',
-    'Blocked by Coupons wizard validation: Destination URL domain resolves to only "https://" for available programs.',
-    async ({ page }) => {
+  // Coupon CREATE is now fixed and covered green by e2e/Coupons/testCouponCreate.spec.ts
+  // (the original blocker was a Destination-URL/program-domain mismatch — see
+  // COUPON_DESTINATION_URL). This longer create+update+toggle lifecycle still
+  // needs its edit-mode selectors refreshed (setCouponCode/openEditForCoupon in
+  // the edit view), so it stays skipped until those are updated.
+  test.skip('Create, update, and toggle coupon', async ({ page }) => {
     await navigateToHome(page);
 
     const couponsPage = new CouponsOffersPage(page);
@@ -94,8 +97,7 @@ test.describe('Coupons & Offers Flow', () => {
     await couponsPage.disableCoupon();
     await couponsPage.openDisabledTab();
     await expect(couponsPage.getCouponTitle(couponTitle)).toBeVisible();
-    },
-  );
+  });
 });
 
 function generateRandomString(length: number, chars: string): string {

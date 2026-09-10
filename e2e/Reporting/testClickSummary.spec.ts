@@ -1,14 +1,16 @@
 import { test, expect } from "@playwright/test";
 import ClicksSummaryPage from "../../pages/ClickSummaryPage";
 import { navigateToHome } from "../../utility/navigationUtils";
+import { AUTH_FILE } from '../../config/environment';
 
 // ── Test data ─────────────────────────────────────────────────────────────────
-const TEST_PROGRAM = "testautomationprogrammqufp"; // update to a stable program in your env
+// A program (and campaign) that exists in this account's Clicks Summary filters.
+const TEST_PROGRAM = "ApprovedDateTest";
 const TEST_CATEGORY = "Car Buying and Selling";
 
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe("Reporting - Clicks Summary", () => {
-  test.use({ storageState: "playwright/.auth/authentication.json" });
+  test.use({ storageState: AUTH_FILE });
 
   // ─────────────────────────────────────────────────────────────────────────
   // TEST 1 — Default page state
