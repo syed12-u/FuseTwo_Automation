@@ -1,0 +1,150 @@
+{
+  "fetchedState": "QA Ready",
+  "excludedCommenter": "jokima",
+  "count": 13,
+  "tickets": [
+    {
+      "id": 220,
+      "title": "FuseTwo.com > Quality Assurance and Accessibility > Responsive and cross-browser layout QA for all pages",
+      "type": "Product Backlog Item",
+      "state": "QA Ready",
+      "severity": "",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Ramagiri Mahesh",
+      "tags": "FuseTwo; PBI; Website; WordPress",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/220"
+    },
+    {
+      "id": 426,
+      "title": "Control > Advertiser Overview > Program Edit > Contact Info [FE]",
+      "type": "Product Backlog Item",
+      "state": "QA Ready",
+      "severity": "",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Dharmendra Dixit",
+      "tags": "",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/426"
+    },
+    {
+      "id": 476,
+      "title": "Control > Advertiser Overview > Program Edit > Contact Info [BE]",
+      "type": "Product Backlog Item",
+      "state": "QA Ready",
+      "severity": "",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Firoz Shaikh",
+      "tags": "",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/476"
+    },
+    {
+      "id": 484,
+      "title": "Control > Advertiser Overview > Program Edit > Payout History [BE]",
+      "type": "Product Backlog Item",
+      "state": "QA Ready",
+      "severity": "",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Firoz Shaikh",
+      "tags": "",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/484"
+    },
+    {
+      "id": 703,
+      "title": "Self-Managed enrolled plan button should advance to next Advertiser Setup step",
+      "type": "Bug",
+      "state": "QA Ready",
+      "severity": "3 - Medium",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Anusha Tripathi",
+      "tags": "Advertiser; frontend; FuseTwo",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/703"
+    },
+    {
+      "id": 740,
+      "title": "Conversion Tracking > Edit JavaScript Code",
+      "type": "Product Backlog Item",
+      "state": "QA Ready",
+      "severity": "",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Vishal Poojary",
+      "tags": "",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/740"
+    },
+    {
+      "id": 742,
+      "title": "Click ID Lookup > Edit Text",
+      "type": "Product Backlog Item",
+      "state": "QA Ready",
+      "severity": "",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Abhishek Khatter",
+      "tags": "",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/742"
+    },
+    {
+      "id": 743,
+      "title": "Management > Tracking > Event Dates Have Incorrect Time Zone",
+      "type": "Bug",
+      "state": "QA Ready",
+      "severity": "3 - Medium",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Firoz Shaikh",
+      "tags": "",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/743"
+    },
+    {
+      "id": 774,
+      "title": "AdvertiserMax > Accounting > Account Summary - showing paid invoice that is not paid",
+      "type": "Bug",
+      "state": "QA Ready",
+      "severity": "1 - Critical",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Pradeep Maurya",
+      "tags": "",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/774"
+    },
+    {
+      "id": 782,
+      "title": "FuseTwo > Automation > Data is not being inserted into the Post Launch table when the program goes live from control.",
+      "type": "Bug",
+      "state": "QA Ready",
+      "severity": "3 - Medium",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Pradeep Maurya",
+      "tags": "",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/782"
+    },
+    {
+      "id": 800,
+      "title": "Programs > Automation > Incorrect Category and Subcategories",
+      "type": "Bug",
+      "state": "QA Ready",
+      "severity": "2 - High",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Kiran Kumar",
+      "tags": "",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/800"
+    },
+    {
+      "id": 803,
+      "title": "FuseTwo > Fix blank columns with data",
+      "type": "Bug",
+      "state": "QA Ready",
+      "severity": "3 - Medium",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Pradeep Maurya",
+      "tags": "",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/803"
+    },
+    {
+      "id": 806,
+      "title": "FuseTwo > Advertiser > Add and Update DefaultPayoutHistory table",
+      "type": "Product Backlog Item",
+      "state": "QA Ready",
+      "severity": "",
+      "boardColumn": "QA Ready",
+      "assignedTo": "Pradeep Maurya",
+      "tags": "",
+      "url": "https://dev.azure.com/fusetwo/Development/_workitems/edit/806"
+    }
+  ]
+}

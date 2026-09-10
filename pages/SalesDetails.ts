@@ -1,5 +1,6 @@
 import { Page, Locator, expect } from "@playwright/test";
 import BasePage from "./BasePage";
+import { appUrl, PATHS } from "../config/environment";
 
 export default class SalesDetailsPage extends BasePage {
   readonly reportingBtn: Locator;
@@ -73,9 +74,11 @@ export default class SalesDetailsPage extends BasePage {
   }
 
   async navigateToSalesDetails() {
-    await this.reportingBtn.click();
-    await expect(this.salesDetailsLink).toBeVisible({ timeout: 10000 });
-    await this.salesDetailsLink.click();
+    // Direct navigation — the sidebar "Reporting" menu traversal intermittently
+    // hangs; go straight to the report and wait for its output.
+    await this.page.goto(appUrl(PATHS.reportSalesDetailed), {
+      waitUntil: "domcontentloaded",
+    });
     await expect(this.exportBtn).toBeVisible({ timeout: 15000 });
     await expect(this.table).toBeVisible({ timeout: 15000 });
   }

@@ -1,0 +1,19 @@
+{
+  "env": "prod",
+  "email": "syed.shah+prodtestmtit7q2s@flexoffers.com",
+  "company": "SYED TEST QA mtit7q2s",
+  "steps": {
+    "step1_captchaRead": true,
+    "step2_reached": true,
+    "thankYou": true,
+    "emailReceived": true,
+    "emailSubject": "Verify Your Email",
+    "verifyResolvedTo": "https://advertiser.fusetwo.com/emailconfirmation?userref=c3llZC5zaGFoK3Byb2R0ZXN0bXRpdDdxMnNAZmxleG9mZmVycy5jb20%3D",
+    "loginLanded": "https://advertiser.fusetwo.com/account/pending-account",
+    "loginBody": "Your application is currently being reviewed. | We want to thank you for taking the time to complete the application and for considering FuseTwo for y"
+  },
+  "managementHost": "https://management.prod.fusetwo.com",
+  "managementReachable": true,
+  "advertiserIdInMgmt": "1062627",
+  "mgmtStatus": "Pending"
+}

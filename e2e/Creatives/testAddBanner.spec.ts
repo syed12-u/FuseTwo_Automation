@@ -2,9 +2,10 @@ import { test, expect } from '@playwright/test';
 import ProgramPage from '../../pages/ProgramPage';
 import CreativesPage from '../../pages/CreativesPage';
 import { navigateToHome } from '../../utility/navigationUtils';
+import { AUTH_FILE } from '../../config/environment';
 
 test.describe('Creatives - Banner Flow', () => {
-    test.use({ storageState: 'playwright/.auth/authentication.json' });
+    test.use({ storageState: AUTH_FILE });
 
     test('Verify user can create a Banner Creative', async ({ page }) => {
         await navigateToHome(page);

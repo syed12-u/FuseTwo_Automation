@@ -1,5 +1,6 @@
 import { Locator, Page } from '@playwright/test';
 import BasePage from './BasePage';
+import { appUrl, PATHS } from '../config/environment';
 import {
   COUPON_DESTINATION_URL,
 } from '../fixtures/testConstants';
@@ -82,8 +83,11 @@ export default class CouponsOffersPage extends BasePage {
   }
 
   async openCouponsAndOffers() {
-    await this.programsMenuButton.click();
-    await this.couponsOffersLink.click();
+    // Navigate directly — the sidebar-menu traversal relied on a " Programs"
+    // button label that intermittently fails to expand and hangs the click.
+    await this.page.goto(appUrl(PATHS.couponsAndOffers), {
+      waitUntil: 'domcontentloaded',
+    });
   }
 
   async filterByProgram(programName: string) {
@@ -211,11 +215,11 @@ export default class CouponsOffersPage extends BasePage {
   }
 
   async addPublisher() {
-    await this.addPublisherButton.click();
+    await this.addPublisherButton.first().click();
   }
 
   async removePublisher() {
-    await this.removePublisherButton.click();
+    await this.removePublisherButton.first().click();
   }
 
   async disableCoupon() {

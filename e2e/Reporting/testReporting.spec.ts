@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import ReportingPage from '../../pages/ReportingPage';
 import { navigateToHome } from '../../utility/navigationUtils';
+import { AUTH_FILE } from '../../config/environment';
 
 test.describe('Reporting - Clicks Detailed Flow', () => {
-    test.use({ storageState: 'playwright/.auth/authentication.json' });
+    test.use({ storageState: AUTH_FILE });
 
     test('Verify user can view clicks detailed report and export data', async ({ page }) => {
         await navigateToHome(page);

@@ -1,0 +1,26 @@
+{
+  "id": "1062786",
+  "findings": [
+    {
+      "label": "detail load",
+      "issues": [
+        "BODY:\"No record\""
+      ],
+      "screenshot": "docs/bug-screens/deepm-detail.png"
+    },
+    {
+      "label": "tab: Details",
+      "issues": [
+        "BODY:\"No record\""
+      ],
+      "screenshot": "docs/bug-screens/deepm-Details.png"
+    },
+    {
+      "label": "tab: Account Summary",
+      "issues": [
+        "BODY:\"No record\""
+      ],
+      "screenshot": "docs/bug-screens/deepm-AccountSummary.png"
+    }
+  ]
+}

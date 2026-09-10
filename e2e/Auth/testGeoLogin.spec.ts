@@ -1,12 +1,12 @@
 import { test, expect, chromium, Request, Response } from '@playwright/test';
 import LoginPage from '../../pages/LoginPage';
 import { GEO_PROXIES, GeoProxyConfig } from '../../fixtures/proxyConstants';
+import { env, PATHS } from '../../config/environment';
 import fs from 'fs';
 import path from 'path';
 
-const loginURL = 'https://advertiser.dev.fusetwo.com/signin';
-// const loginURL = 'https://publisherprobeta.flexoffers.com';
-const homePageURL = 'app/dashboard';
+const loginURL = env.signinUrl;
+const homePageURL = PATHS.dashboard.replace(/^\//, '');
 const username = process.env.FO_USERNAME ?? '';
 const password = process.env.FO_PASSWORD ?? '';
 

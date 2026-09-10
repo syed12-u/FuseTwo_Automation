@@ -1,74 +1,101 @@
-import { defineConfig, devices, test } from '@playwright/test';
-import process from 'process';
-//import HomePage from './pages/HomePage';
-let baseURL = process.env.HOME_URL;
+import { defineConfig, devices } from "@playwright/test";
+import process from "process";
 
-/**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
-import { config as dotenvConfig } from 'dotenv';
-dotenvConfig();
+// Resolves TEST_ENV (dev | staging | prod), loads the matching config/env/*.env
+// plus .env, and exposes typed hosts/credentials. Importing it also backfills
+// the legacy process.env.URL / HOME_URL used by older specs.
+import { env } from "./config/environment";
 
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
 
-// Optional CI-only DNS override. Leave CI_DEV_HOST_IP unset when the agent can
-// resolve advertiser.dev.fusetwo.com normally. Set it only when the agent's DNS
-// is broken and the override IP is confirmed reachable from that agent.
+// Optional CI-only DNS override for the internal dev host. Leave CI_DEV_HOST_IP
+// unset when the agent can resolve advertiser.dev.fusetwo.com normally. Set it
+// only when the agent's DNS is broken and the override IP is confirmed
+// reachable from that agent. Never applied outside the dev environment.
 const ciDevHostIp = process.env.CI_DEV_HOST_IP;
-const hasCiDevHostIp = !!ciDevHostIp && !ciDevHostIp.startsWith('$(');
+const hasCiDevHostIp = !!ciDevHostIp && !ciDevHostIp.startsWith("$(");
 const ciBrowserArgs =
-  process.env.CI && hasCiDevHostIp
-    ? [`--host-resolver-rules=MAP advertiser.dev.fusetwo.com ${ciDevHostIp}`]
+  process.env.CI && hasCiDevHostIp && env.name === "dev"
+    ? [
+        `--host-resolver-rules=MAP ${
+          new URL(env.appBaseUrl).hostname
+        } ${ciDevHostIp}`,
+      ]
     : [];
+
+// The management portal is IIS with Windows Integrated Authentication and
+// answers 401 with "WWW-Authenticate: Negotiate, NTLM" before the application
+// loads. Playwright's httpCredentials cannot satisfy that (Basic/Digest only),
+// so Chromium is allowed to single-sign-on with the current Windows domain
+// session for these hosts. Without this every management test sees the IIS
+// "401 - Unauthorized" page instead of the app.
+const ssoArgs = [
+  `--auth-server-allowlist=${env.authServerAllowlist}`,
+  `--auth-negotiate-delegate-allowlist=${env.authServerAllowlist}`,
+];
+
+// Tag policy
+// ----------
+// @blocker    must pass before a release ships — the release gate runs these
+// @crud       create/read/update/delete coverage for a module
+// @smoke      fastest signal that the app is alive
+// @write      mutates real data; skipped automatically on prod
+// @known-bug  guards an open defect, so it is expected to fail today. Excluded
+//             from every gating run and reported by the `known-bugs` project.
+const excludedTags = ["@known-bug", ...(env.allowWriteTests ? [] : ["@write"])];
+const excludeTagPattern = new RegExp(excludedTags.join("|"));
+
+// Print the resolved target once at startup. Without this a run against the
+// wrong environment looks identical in the logs to a correct one.
+console.log(
+  `[fusetwo-e2e] TEST_ENV=${env.name}  app=${env.appBaseUrl}  management=${env.managementBaseUrl}  ` +
+    `writes=${
+      env.allowWriteTests ? "allowed" : "blocked"
+    }  skipping=${excludedTags.join(",")}`,
+);
 
 export default defineConfig({
   timeout: 2 * 60 * 1000,
   expect: {
     timeout: 30 * 1000,
   },
-  // globalSetup: "./global-setup",
-  testDir: './e2e',
+  testDir: "./e2e",
   /* Run tests in files in parallel */
   fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  //workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   /* Run all tests sequentially */
-  workers:  1,
+  workers: 1,
   reporter: process.env.CI
     ? [
-        ['list'],
-        ['junit', { outputFile: 'test-results/junit.xml' }],
-        ['html', { open: 'never' }],
+        ["list"],
+        ["junit", { outputFile: "test-results/junit.xml" }],
+        ["html", { open: "never" }],
       ]
-    : 'html',
+    : "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    // baseURL: 'http://127.0.0.1:3000',
-
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    // baseURL: process.env.URL,
-  //   trace: 'on-first-retry',
+    /* Resolved from TEST_ENV, so page.goto('/app/programs') hits the right host. */
+    baseURL: env.appBaseUrl,
+    ignoreHTTPSErrors: env.ignoreHttpsErrors,
+    trace: "on-first-retry",
+    video: "retain-on-failure",
     launchOptions: {
-      args: ciBrowserArgs,
-      // slowMo: 500, // smoother base delay
+      args: [...ssoArgs, ...ciBrowserArgs],
     },
-    // storageState: "./LoginAuth.json",
   },
 
-  /* Configure projects for major browsers */
   projects: [
-    { name: 'setup', testMatch: /.*\.setup\.ts/ },
+    { name: "setup", testMatch: /.*\.setup\.ts/ },
+
+    /* Day-to-day run. Suites listed in testIgnore need dedicated data or a
+       proxy and are exercised by their own npm scripts instead. */
     {
-      name: 'chromium',
+      name: "chromium",
       testIgnore: [
         /Auth[\\/].*GeoLogin\.spec\.ts/,
         /Auth[\\/].*FlexOffersSignUp\.spec\.ts/,
@@ -76,11 +103,29 @@ export default defineConfig({
         /MessageCenter[\\/].*\.spec\.ts/,
         /Reporting[\\/]testReporting\.spec\.ts/,
       ],
-      use: {
-        ...devices['Desktop Chrome'],
-        //storageState: 'playwright/.auth/hrUser.json',
-      },
-      dependencies: ['setup'],
+      grepInvert: excludeTagPattern,
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+    },
+
+    /* Release gate: every @blocker scenario across all modules, with no
+       testIgnore. This is the one to run against a release candidate. */
+    {
+      name: "release-gate",
+      grep: /@blocker/,
+      grepInvert: excludeTagPattern,
+      testIgnore: [/Auth[\\/].*GeoLogin\.spec\.ts/],
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+    },
+
+    /* Regression guards for defects that are still open. Expected to fail
+       until the bug is fixed — run it to check whether a release fixed them. */
+    {
+      name: "known-bugs",
+      grep: /@known-bug/,
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
     },
 
     // geo-login disabled: the BrightData proxy variables (BRIGHTDATA_HOST/PORT/
@@ -96,52 +141,5 @@ export default defineConfig({
     //   },
     //   // No setup dependency — these tests manage their own browser context with proxy
     // },
-
-    // {
-    //   name: 'firefox',
-    //   use: { ...devices['Desktop Firefox'] },
-    // },
-
-    // {
-    //   name: 'webkit',
-    //   use: { ...devices['Desktop Safari'] },
-    // },
-
-    /* Test against mobile viewports. */
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
-
-    /* Test against branded browsers. */
-    // {
-    //   name: 'Microsoft Edge',
-    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    // },
-    // {
-    //   name: 'Google Chrome',
-    //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    // },
   ],
-
-  /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://127.0.0.1:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
 });
-
-// test.beforeAll(async ({ browser }) => {
-//   const context = await browser.newContext(); // Create a browser context
-//   const page = await context.newPage(); // Create a new page within the context
-
-//   // Navigate to the main page
-//   // await page.goto('your_main_page_url_here');
-//   const homePage = new HomePage(page);
-//   if (typeof baseURL === 'string') { await homePage.navigateTo(baseURL); }
-// });

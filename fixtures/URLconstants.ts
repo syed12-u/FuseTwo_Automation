@@ -1,1 +1,3 @@
-export const PRODUCTS_MANAGE_URL = 'https://advertiser.dev.fusetwo.com/app/products/manage';
+import { appUrl, PATHS } from '../config/environment';
+
+export const PRODUCTS_MANAGE_URL = appUrl(PATHS.productsManage);

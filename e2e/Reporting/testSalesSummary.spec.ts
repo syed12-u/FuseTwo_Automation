@@ -1,11 +1,12 @@
 import { test, expect } from "@playwright/test";
 import SalesSummaryPage from "../../pages/SalesSummaryPage";
 import { navigateToHome } from "../../utility/navigationUtils";
+import { AUTH_FILE } from '../../config/environment';
 
 const ALTERNATE_FILTER_VALUE = "test";
 
 test.describe("Reporting - Sales Summary", () => {
-  test.use({ storageState: "playwright/.auth/authentication.json" });
+  test.use({ storageState: AUTH_FILE });
 
   async function openSalesSummary(page) {
     await navigateToHome(page);

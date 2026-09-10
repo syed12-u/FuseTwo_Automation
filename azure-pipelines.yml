@@ -1,3 +1,26 @@
+parameters:
+  # Choose the target when queueing the pipeline manually. Scheduled and CI runs
+  # use the default (dev). Hosts for each value live in config/env/<value>.env.
+  - name: testEnv
+    displayName: Target environment
+    type: string
+    default: dev
+    values:
+      - dev
+      - staging
+      - prod
+
+  # "chromium" is the full day-to-day suite. "release-gate" runs only @blocker
+  # scenarios -- queue that against a release candidate.
+  - name: playwrightProject
+    displayName: Playwright project
+    type: string
+    default: chromium
+    values:
+      - chromium
+      - release-gate
+      - known-bugs
+
 trigger:
   branches:
     include:
@@ -27,9 +50,12 @@ pool:
 
 variables:
   nodeVersion: "20.x"
+  TEST_ENV: ${{ parameters.testEnv }}
+  PLAYWRIGHT_PROJECT: ${{ parameters.playwrightProject }}
   # DEV-FT-BUILD01 currently cannot resolve advertiser.dev.fusetwo.com via
   # corp DNS, so Chromium maps the host to this IP during CI. The preflight step
-  # validates the IP is reachable before Playwright runs.
+  # validates the IP is reachable before Playwright runs. Only the dev
+  # environment uses it; playwright.config.ts ignores it elsewhere.
   CI_DEV_HOST_IP: "10.2.30.126"
 
 steps:
@@ -51,15 +77,17 @@ steps:
     displayName: Install Playwright browsers
     condition: ne(variables['Agent.OS'], 'Linux')
 
-  # Build .env on the agent. Secrets are mapped via env (Azure does not expand
-  # secret $(...) macros into inline scripts), then written with PowerShell.
+  # Build .env on the agent -- CREDENTIALS ONLY. Secrets are mapped via env
+  # (Azure does not expand secret $(...) macros into inline scripts), then
+  # written with PowerShell.
+  #
+  # Host URLs are deliberately NOT written here. They come from
+  # config/env/$(TEST_ENV).env, so a dev URL left in a pipeline variable can no
+  # longer hijack a staging or prod run.
   - powershell: |
       @"
-      URL=$env:URL
-      HOME_URL=$env:HOME_URL
       FO_USERNAME=$env:FO_USERNAME
       FO_PASSWORD=$env:FO_PASSWORD
-      FLEXOFFERS_SIGNUP_URL=$env:FLEXOFFERS_SIGNUP_URL
       CONTROL_USERNAME=$env:CONTROL_USERNAME
       CONTROL_PASSWORD=$env:CONTROL_PASSWORD
       BRIGHTDATA_HOST=$env:BRIGHTDATA_HOST
@@ -70,11 +98,8 @@ steps:
       "@ | Out-File -FilePath .env -Encoding ascii
     displayName: Create runtime environment file
     env:
-      URL: $(URL)
-      HOME_URL: $(HOME_URL)
       FO_USERNAME: $(FO_USERNAME)
       FO_PASSWORD: $(FO_PASSWORD)
-      FLEXOFFERS_SIGNUP_URL: $(FLEXOFFERS_SIGNUP_URL)
       CONTROL_USERNAME: $(CONTROL_USERNAME)
       CONTROL_PASSWORD: $(CONTROL_PASSWORD)
       BRIGHTDATA_HOST: $(BRIGHTDATA_HOST)
@@ -119,18 +144,23 @@ steps:
   # NOTE: the DNS workaround for net::ERR_NAME_NOT_RESOLVED is controlled by
   # CI_DEV_HOST_IP. Update that variable if the dev host IP changes.
 
-  # Run all Playwright projects (setup + chromium + geo-login) in a single
-  # invocation. A single run is deliberate: Playwright wipes the test-results/
-  # output dir at the start of every run, so two separate runs would erase each
-  # other's artifacts and junit. continueOnError lets the run report failures
-  # without reddening the build here -- the gate step below decides red/green.
+  # One project per run, selected by the playwrightProject parameter. Playwright
+  # pulls in the `setup` dependency automatically. A single invocation is
+  # deliberate: Playwright wipes the test-results/ output dir at the start of
+  # every run, so two separate runs would erase each other's artifacts and
+  # junit. continueOnError lets the run report failures without reddening the
+  # build here -- the gate step below decides red/green.
+  #
+  # @known-bug tests never run in the chromium or release-gate projects; queue
+  # the known-bugs project to check whether a release fixed the open defects.
   # Files excluded via testIgnore in playwright.config.ts still won't run until
   # their known issues are fixed (signup CAPTCHA, message-center login, etc.).
-  - script: npx playwright test
-    displayName: Run Playwright tests (all projects)
+  - script: npx playwright test --project=$(PLAYWRIGHT_PROJECT)
+    displayName: Run Playwright tests ($(PLAYWRIGHT_PROJECT) on $(TEST_ENV))
     continueOnError: true
     env:
       CI: "true"
+      TEST_ENV: $(TEST_ENV)
 
   # If setup/install fails before Playwright creates these folders, the publish
   # steps should not add extra red herrings to the run summary.

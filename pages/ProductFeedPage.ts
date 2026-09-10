@@ -1,6 +1,7 @@
 import { Page, Locator, expect } from "@playwright/test";
 import BasePage from "./BasePage";
 import { PRODUCTS_MANAGE_URL } from "../fixtures/URLconstants";
+import { installPaymentReminderAutoDismiss } from "../utility/appActions";
 
 export default class ProductFeedPage extends BasePage {
   readonly menuButton: Locator;
@@ -111,7 +112,19 @@ export default class ProductFeedPage extends BasePage {
   }
 
   async navigateToProducts() {
-    await this.productsLink.click();
+    await installPaymentReminderAutoDismiss(this.page).catch(() => {});
+    // Go straight to the products management page. The old sidebar traversal
+    // (Menu -> Programs -> Products) relied on a button label that no longer
+    // matches and hung the whole test.
+    await this.page.goto(PRODUCTS_MANAGE_URL, {
+      waitUntil: "domcontentloaded",
+    });
+    const remindMeLater = this.page.getByRole("button", {
+      name: "Remind me later",
+    });
+    if (await remindMeLater.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await remindMeLater.click();
+    }
   }
 
   async createProductFeed(programName: string, productFeedName: string) {

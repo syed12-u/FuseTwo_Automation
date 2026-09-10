@@ -1,0 +1,178 @@
+[
+ {
+  "name": "dashboard",
+  "route": "/app/dashboard",
+  "status": 200,
+  "failedApi": [
+   "500 GET /api/1062551/programs"
+  ],
+  "consoleErr": 2,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": "docs/bug-screens/dashboard.png"
+ },
+ {
+  "name": "programs",
+  "route": "/app/programs",
+  "status": 200,
+  "failedApi": [
+   "500 GET /api/1062551/programs"
+  ],
+  "consoleErr": 2,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": "docs/bug-screens/programs.png"
+ },
+ {
+  "name": "campaigns",
+  "route": "/app/campaigns",
+  "status": 200,
+  "failedApi": [
+   "500 GET /api/1062551/programs"
+  ],
+  "consoleErr": 1,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": "docs/bug-screens/campaigns.png"
+ },
+ {
+  "name": "creatives",
+  "route": "/app/creatives",
+  "status": 200,
+  "failedApi": [
+   "500 GET /api/1062551/programs"
+  ],
+  "consoleErr": 1,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": "docs/bug-screens/creatives.png"
+ },
+ {
+  "name": "coupons",
+  "route": "/app/couponsandoffers",
+  "status": 200,
+  "failedApi": [
+   "500 GET /api/1062551/programs"
+  ],
+  "consoleErr": 1,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": "docs/bug-screens/coupons.png"
+ },
+ {
+  "name": "products",
+  "route": "/app/products",
+  "status": 200,
+  "failedApi": [
+   "500 GET /api/1062551/programs"
+  ],
+  "consoleErr": 1,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": "docs/bug-screens/products.png"
+ },
+ {
+  "name": "publishers",
+  "route": "/app/publishers/publisherlist",
+  "status": 200,
+  "failedApi": [],
+  "consoleErr": 0,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": null
+ },
+ {
+  "name": "performance",
+  "route": "/app/reports/performance",
+  "status": 200,
+  "failedApi": [],
+  "consoleErr": 0,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": null
+ },
+ {
+  "name": "salessummary",
+  "route": "/app/reports/salessummary",
+  "status": 200,
+  "failedApi": [],
+  "consoleErr": 0,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": null
+ },
+ {
+  "name": "salesdetailed",
+  "route": "/app/reports/salesdetailed",
+  "status": 200,
+  "failedApi": [
+   "500 GET /api/1062551/programs"
+  ],
+  "consoleErr": 1,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": "docs/bug-screens/salesdetailed.png"
+ },
+ {
+  "name": "clicksdetailed",
+  "route": "/app/reports/clicksdetailed",
+  "status": 200,
+  "failedApi": [
+   "500 GET /api/1062551/programs"
+  ],
+  "consoleErr": 2,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": "docs/bug-screens/clicksdetailed.png"
+ },
+ {
+  "name": "clickssummary",
+  "route": "/app/reports/clickssummary",
+  "status": 200,
+  "failedApi": [],
+  "consoleErr": 0,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": null
+ },
+ {
+  "name": "myaccount",
+  "route": "/app/settings/myaccount",
+  "status": 200,
+  "failedApi": [],
+  "consoleErr": 0,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": null
+ },
+ {
+  "name": "helpdesk",
+  "route": "/app/support/helpdesk",
+  "status": 200,
+  "failedApi": [],
+  "consoleErr": 0,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": null
+ },
+ {
+  "name": "reconcile",
+  "route": "/app/accounting/reconcile",
+  "status": 200,
+  "failedApi": [],
+  "consoleErr": 0,
+  "jsErr": [],
+  "bodyErr": null,
+  "screenshot": null
+ },
+ {
+  "name": "messagecenter",
+  "route": "/app/messagecenter",
+  "status": 200,
+  "failedApi": [],
+  "consoleErr": 0,
+  "jsErr": [],
+  "bodyErr": "Oops",
+  "screenshot": "docs/bug-screens/messagecenter.png"
+ }
+]

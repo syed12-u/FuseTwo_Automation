@@ -1,28 +1,34 @@
-import { test as setup, expect, Page } from '@playwright/test';
-import LoginPage from '../../pages/LoginPage';
+import { test as setup, expect, Page } from "@playwright/test";
+import LoginPage from "../../pages/LoginPage";
+import {
+  AUTH_FILE,
+  PATHS,
+  env,
+  requireAdvertiserCredentials,
+} from "../../config/environment";
 
-const authFile = 'playwright/.auth/authentication.json';
+setup(
+  `Authenticate With Advertiser Max Login (${env.name})`,
+  async ({ page }) => {
+    const { username, password } = requireAdvertiserCredentials();
 
-setup('Authenticate With Advertiser Max Login', async ({ page }) => {
-  await loginUser(page, process.env.FO_USERNAME, process.env.FO_PASSWORD);
-
-  await page.context().storageState({ path: authFile });
-});
-
-
-async function loginUser(page: Page, username: string | undefined, password: string | undefined) {
-  const loginPage = new LoginPage(page);
-  const baseURL = process.env.URL;
-  const homepageUrl = process.env.HOME_URL;
-  if (
-    typeof baseURL === 'string' &&
-    typeof homepageUrl === 'string' &&
-    typeof username === 'string' &&
-    typeof password === 'string'
-  ) {
-    await loginPage.navigateTo(baseURL);
+    const loginPage = new LoginPage(page);
+    await loginPage.navigateTo(env.signinUrl);
     await loginPage.login(username, password);
-    const completeURL = new URL(homepageUrl, baseURL).toString();
-    await page.waitForURL(completeURL);
-  }
-}
+
+    // Leaving /signin for an authenticated page is the proof the session is real.
+    // The exact landing page depends on the account's onboarding status — an
+    // approved account lands on /app/dashboard, but one in "Initial Setup" lands
+    // on /app/settings/advertisersetup, one in "Collect Payment" on
+    // /account/collect-payment, etc. Waiting strictly for the dashboard would
+    // break whenever the shared test account is not fully approved, so wait for
+    // "no longer on signin" and confirm the app shell rendered instead.
+    await page.waitForURL((url) => !/\/signin/i.test(url.pathname), {
+      timeout: 90_000,
+    });
+    await expect(page).not.toHaveURL(new RegExp(PATHS.signin, "i"));
+    await expect(page.getByText(/needs to be verified/i)).toHaveCount(0);
+
+    await page.context().storageState({ path: AUTH_FILE });
+  },
+);

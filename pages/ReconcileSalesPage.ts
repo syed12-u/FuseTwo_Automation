@@ -1,5 +1,6 @@
 import { expect, Locator, Page } from "@playwright/test";
 import BasePage from "./BasePage";
+import { appUrl, PATHS } from "../config/environment";
 
 export type ReconcileStatus =
   | "Approved"
@@ -69,12 +70,9 @@ export default class ReconcileSalesPage extends BasePage {
   }
 
   async navigateToReconcileSales() {
-    await this.page.goto(
-      "https://advertiser.dev.fusetwo.com/app/accounting/reconcile",
-      {
-        waitUntil: "networkidle",
-      },
-    );
+    await this.page.goto(appUrl(PATHS.reconcileSales), {
+      waitUntil: "networkidle",
+    });
     await expect(this.addNewButton).toBeVisible({ timeout: 30000 });
     await expect(this.table).toBeVisible({ timeout: 30000 });
   }

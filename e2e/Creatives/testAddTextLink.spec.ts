@@ -3,9 +3,10 @@ import ProgramPage from '../../pages/ProgramPage';
 import CreativesPage from '../../pages/CreativesPage';
 import { navigateToHome } from '../../utility/navigationUtils';
 import { CREATIVE_TEXT } from '../../fixtures/testConstants';
+import { AUTH_FILE } from '../../config/environment';
 
 test.describe('Creatives - Text Link Flow', () => {
-    test.use({ storageState: 'playwright/.auth/authentication.json' });
+    test.use({ storageState: AUTH_FILE });
 
     test('Verify user can create a Text Link Creative', async ({ page }) => {
 

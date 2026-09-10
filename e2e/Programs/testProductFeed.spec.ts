@@ -1,8 +1,6 @@
 import { test } from "@playwright/test";
 import ProductFeedPage from "../../pages/ProductFeedPage";
-import ProgramPage from "../../pages/ProgramPage";
-import { PRODUCTS_MANAGE_URL } from "../../fixtures/URLconstants";
-import { navigateToHome } from "../../utility/navigationUtils";
+import { AUTH_FILE } from "../../config/environment";
 
 const programName = "testautomationprogram";
 const productFeedName = `Test_QA_Product_Feed_${Math.random()
@@ -11,15 +9,12 @@ const productFeedName = `Test_QA_Product_Feed_${Math.random()
 const filePath = "fixtures/Product_Feed_csv/Oweli_Product_Feed.csv";
 
 test.describe("Product Feed Tests", () => {
-  test.use({ storageState: "playwright/.auth/authentication.json" });
+  test.use({ storageState: AUTH_FILE });
   test("Create, Import, and Deactivate Product Feed", async ({ page }) => {
-    const programPage = new ProgramPage(page);
     const productFeedPage = new ProductFeedPage(page);
 
-    await navigateToHome(page);
-
-    // Navigate to Products
-    await programPage.navigateToProgramsMenu();
+    // Navigate straight to Products (the sidebar-menu traversal relied on a
+    // stale button label and hung).
     await productFeedPage.navigateToProducts();
 
     // Create Product Feed

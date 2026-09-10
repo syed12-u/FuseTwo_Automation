@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import ProgramPage from '../../pages/ProgramPage';
 import { navigateToHome } from '../../utility/navigationUtils';
+import { AUTH_FILE } from '../../config/environment';
 
 test.describe('Program Creation Flow', () => {
-    test.use({ storageState: 'playwright/.auth/authentication.json' });
+    test.use({ storageState: AUTH_FILE });
     test('Verify user can create a program', async ({ page }) => {
 
         await navigateToHome(page);

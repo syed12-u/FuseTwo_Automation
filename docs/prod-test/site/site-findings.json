@@ -1,0 +1,110 @@
+[
+  {
+    "page": "home",
+    "path": "/",
+    "status": 200,
+    "title": "Home - FuseTwo",
+    "devLinks": [
+      "https://advertiser.dev.fusetwo.com/signin",
+      "https://advertiser.dev.fusetwo.com/signup"
+    ],
+    "failed": [],
+    "consoleErr": 1
+  },
+  {
+    "page": "platform",
+    "path": "/platform/",
+    "status": 200,
+    "title": "Platform - FuseTwo",
+    "devLinks": [
+      "https://advertiser.dev.fusetwo.com/signin",
+      "https://advertiser.dev.fusetwo.com/signup"
+    ],
+    "failed": [],
+    "consoleErr": 1
+  },
+  {
+    "page": "brands",
+    "path": "/brands/",
+    "status": 200,
+    "title": "Brands - FuseTwo",
+    "devLinks": [
+      "https://advertiser.dev.fusetwo.com/signin",
+      "https://advertiser.dev.fusetwo.com/signup"
+    ],
+    "failed": [],
+    "consoleErr": 0
+  },
+  {
+    "page": "services",
+    "path": "/brands/services/",
+    "status": 200,
+    "title": "Services - FuseTwo",
+    "devLinks": [
+      "https://advertiser.dev.fusetwo.com/signin",
+      "https://advertiser.dev.fusetwo.com/signup"
+    ],
+    "failed": [],
+    "consoleErr": 0
+  },
+  {
+    "page": "industries",
+    "path": "/brands/industries/",
+    "status": 200,
+    "title": "Industries - FuseTwo",
+    "devLinks": [
+      "https://advertiser.dev.fusetwo.com/signin",
+      "https://advertiser.dev.fusetwo.com/signup"
+    ],
+    "failed": [],
+    "consoleErr": 0
+  },
+  {
+    "page": "publishers",
+    "path": "/publishers/",
+    "status": 200,
+    "title": "Publishers - FuseTwo",
+    "devLinks": [
+      "https://advertiser.dev.fusetwo.com/signin",
+      "https://advertiser.dev.fusetwo.com/signup"
+    ],
+    "failed": [],
+    "consoleErr": 2
+  },
+  {
+    "page": "about",
+    "path": "/about-us/",
+    "status": 200,
+    "title": "About Us - FuseTwo",
+    "devLinks": [
+      "https://advertiser.dev.fusetwo.com/signin",
+      "https://advertiser.dev.fusetwo.com/signup"
+    ],
+    "failed": [],
+    "consoleErr": 0
+  },
+  {
+    "page": "privacy",
+    "path": "/privacy-policy/",
+    "status": 200,
+    "title": "Privacy Policy - FuseTwo",
+    "devLinks": [
+      "https://advertiser.dev.fusetwo.com/signin",
+      "https://advertiser.dev.fusetwo.com/signup"
+    ],
+    "failed": [],
+    "consoleErr": 0
+  },
+  {
+    "page": "terms",
+    "path": "/terms-and-conditions/",
+    "status": 200,
+    "title": "Terms and Conditions - FuseTwo",
+    "devLinks": [
+      "https://advertiser.dev.fusetwo.com/signin",
+      "https://advertiser.dev.fusetwo.com/signup"
+    ],
+    "failed": [],
+    "consoleErr": 0
+  }
+]

@@ -18,7 +18,7 @@ export default class ControlLoginPage extends BasePage {
         const password = process.env.CONTROL_PASSWORD;
 
         if (!username || !password) {
-            throw new Error('CONTROL_USERNAME or CONTROL_PASSWORD env vars not set');
+            throw new Error('CONTROL_USERNAME or _PASSWORD env vars not set');
         }
 
         await this.usernameField.fill(username);

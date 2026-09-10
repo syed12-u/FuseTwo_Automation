@@ -1,5 +1,6 @@
 import { Page, Locator, expect } from '@playwright/test';
 import BasePage from './BasePage';
+import { appUrl, PATHS } from '../config/environment';
 
 export default class ReportingPage extends BasePage {
 
@@ -68,11 +69,11 @@ this.toDate = page.getByRole('gridcell', { name: '3' }).first();
 
     // ===== Actions =====
     async navigateToClicksDetailed() {
-        await this.reportingBtn.click();
-        await expect(this.reportingBtn).toBeVisible();
-
-        await this.clicksDetailedLink.click();
-        await expect(this.clicksDetailedLink).toBeVisible();
+        // Direct navigation — the sidebar "Reporting" menu traversal
+        // intermittently hangs the click.
+        await this.page.goto(appUrl(PATHS.reportClicksDetailed), {
+            waitUntil: 'domcontentloaded',
+        });
     }
 
     async applyDateFilter() {

@@ -1,6 +1,7 @@
 import { expect, Page, test } from "@playwright/test";
 import ReconcileSalesPage from "../../pages/ReconcileSalesPage";
 import { navigateToHome } from "../../utility/navigationUtils";
+import { AUTH_FILE } from '../../config/environment';
 
 const PROGRAM_ID = 249231;
 const PROGRAM_NAME = "Test4302026";
@@ -48,7 +49,7 @@ async function getActionableSale(reconcileSalesPage: ReconcileSalesPage) {
 }
 
 test.describe("Reconcile Sales", () => {
-  test.use({ storageState: "playwright/.auth/authentication.json" });
+  test.use({ storageState: AUTH_FILE });
 
   test("Verify Reconcile Sales page loads current month data", async ({
     page,

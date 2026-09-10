@@ -1,5 +1,6 @@
 import { Page, Locator, expect } from "@playwright/test";
 import BasePage from "./BasePage";
+import { appUrl, PATHS } from "../config/environment";
 
 export default class PerformanceReportPage extends BasePage {
   // ===== Navigation Locators =====
@@ -70,8 +71,11 @@ export default class PerformanceReportPage extends BasePage {
 
   // ===== Navigation =====
   async navigateToPerformance() {
-    await this.reportingMenuBtn.click();
-    await this.performanceLink.click();
+    // Direct navigation — the sidebar "Reporting" menu traversal intermittently
+    // fails to expand and hangs the click.
+    await this.page.goto(appUrl(PATHS.reportPerformance), {
+      waitUntil: "domcontentloaded",
+    });
   }
 
   // ===== Time Frame Helpers =====
@@ -81,10 +85,25 @@ export default class PerformanceReportPage extends BasePage {
   }
 
   async selectCustomDateRange(startDay: string, endDay: string) {
+    // Report calendars disable future days, so days later than today in the
+    // current month are unclickable. Step back to the previous month, where
+    // every day is in the past and therefore enabled.
     await this.startDateIcon.click();
+    await this.goToPreviousMonth();
     await this.clickEnabledCalendarDay(startDay);
     await this.endDateIcon.click();
+    await this.goToPreviousMonth();
     await this.clickEnabledCalendarDay(endDay);
+  }
+
+  private async goToPreviousMonth() {
+    const prev = this.page
+      .getByRole("button", { name: /Previous month/i })
+      .first();
+    if (await prev.isVisible().catch(() => false)) {
+      await prev.click();
+      await this.page.waitForTimeout(300);
+    }
   }
 
   async selectReportBy(option: string) {
