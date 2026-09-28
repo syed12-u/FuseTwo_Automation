@@ -40,13 +40,79 @@ export async function installPaymentReminderAutoDismiss(page: Page): Promise<voi
 }
 
 /**
+ * "Terms and Conditions" modal (FuseTwo Advertiser Services Agreement). It opens
+ * over every page until the account accepts, and because it is an MUI modal it
+ * marks the rest of the page aria-hidden — so role-based locators report
+ * "element(s) not found" rather than "blocked", which reads like a missing
+ * control. Its only action is "Ok", which submits the acceptance — and "Ok" is
+ * not rendered at all until the agreement text has been scrolled to the end.
+ */
+function termsDialog(page: Page) {
+  return page.locator('.termConditionDialog [role="dialog"]');
+}
+
+async function scrollAndAcceptTerms(page: Page) {
+  const dialog = termsDialog(page);
+  // Two variants have shipped: "Ok" appearing once the text is scrolled to the
+  // end, and (staging, Sep 2026) an "I accept the terms" checkbox + CONTINUE.
+  const ok = dialog.getByRole('button', { name: /^(Ok|Continue)$/i });
+  const acceptBox = dialog.getByRole('checkbox', { name: /I accept the terms/i });
+  // The locator handler and an explicit acceptTermsIfPresent() can race; every
+  // step tolerates the dialog having been closed by the other one meanwhile.
+  await expect(async () => {
+    if (!(await dialog.isVisible())) return;
+    await dialog.evaluate(
+      (root) => {
+        root.querySelectorAll('*').forEach((el) => {
+          if (el.scrollHeight > el.clientHeight + 10) el.scrollTop = el.scrollHeight;
+        });
+      },
+      undefined,
+      { timeout: 2_000 },
+    );
+    await expect(ok).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
+  if (!(await dialog.isVisible())) return;
+  if (await acceptBox.count()) await acceptBox.check({ timeout: 5_000 }).catch(() => {});
+  await ok.click({ timeout: 5_000 }).catch(() => {});
+  await expect(dialog).toBeHidden({ timeout: 15_000 });
+}
+
+const TERMS_FLAG = Symbol.for('fusetwo.termsAutoAccept');
+
+/** Accept the Terms modal whenever it appears during the test. Idempotent per page. */
+export async function installTermsAutoAccept(page: Page): Promise<void> {
+  const flagged = page as unknown as Record<symbol, boolean>;
+  if (flagged[TERMS_FLAG]) return;
+  flagged[TERMS_FLAG] = true;
+
+  await page.addLocatorHandler(termsDialog(page), async () => {
+    await scrollAndAcceptTerms(page).catch(() => {});
+  });
+}
+
+/** Accept the Terms modal if it is showing now; resolves quickly when absent. */
+export async function acceptTermsIfPresent(page: Page): Promise<boolean> {
+  await installTermsAutoAccept(page).catch(() => {});
+  // The modal mounts a moment after the page, so wait briefly rather than peek.
+  const shown = await termsDialog(page)
+    .waitFor({ state: 'visible', timeout: 8_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return false;
+  await scrollAndAcceptTerms(page);
+  return true;
+}
+
+/**
  * Close the payment reminder when it is showing, and arm the auto-dismiss
  * handler for the rest of the test. Safe to call on any page — it resolves
  * immediately when the modal is absent.
  */
 export async function dismissPaymentReminderIfPresent(page: Page): Promise<boolean> {
-  // Arm the always-on handler so a later pop-up can never block the run.
+  // Arm the always-on handlers so a later pop-up can never block the run.
   await installPaymentReminderAutoDismiss(page).catch(() => {});
+  await installTermsAutoAccept(page).catch(() => {});
 
   const dismiss = paymentDismissButton(page);
   if (!(await dismiss.isVisible({ timeout: 3_000 }).catch(() => false))) {

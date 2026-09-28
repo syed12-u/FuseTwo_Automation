@@ -90,41 +90,47 @@ test.describe("Remaining tabs - smoke (read-only)", () => {
     await noServerError(page);
   });
 
-  test("Settings - Advertiser Setup: all 5 tabs render @smoke", async ({
+  // Advertiser Setup is now the New Advertiser Setup wizard; the five program
+  // tabs live inside its "Create a Program" step (see testAdvertiserSetupWizard).
+  test("Settings - New Advertiser Setup: wizard steps render @smoke", async ({
     page,
   }) => {
     await page.goto(appUrl("/app/settings/advertisersetup"), {
       waitUntil: "domcontentloaded",
     });
     await dismissPaymentReminderIfPresent(page);
-    for (const tab of [
-      "GENERAL",
-      "PROGRAM DEFAULTS",
-      "ADVANCED COMMISSIONS",
-      "PUBLISHER APPROVAL",
-      "SEARCH KEYWORDS",
+    for (const step of [
+      "Introduction",
+      "Select a Plan",
+      "Create a Program",
+      "Create a Campaign",
+      "Conversion Tracking",
+      "Create Test Transaction",
     ]) {
       await expect(
-        page.getByRole("tab", { name: new RegExp(tab, "i") }),
-        `Advertiser Setup tab "${tab}" missing`,
+        page.getByText(step, { exact: true }).first(),
+        `Advertiser Setup step "${step}" missing`,
       ).toBeVisible({ timeout: 30_000 });
     }
     await noServerError(page);
   });
 
-  test("Settings - Tracking Pixel: 4 tabs + Get JavaScript @smoke", async ({
+  test("Settings - Tracking Pixel: 3 tabs + Get JavaScript @smoke", async ({
     page,
   }) => {
     await page.goto(appUrl("/app/settings/trackingpixel"), {
       waitUntil: "domcontentloaded",
     });
     await dismissPaymentReminderIfPresent(page);
-    for (const tab of ["JAVASCRIPT", "SERVER 2 SERVER", "ECOMMERCE", "API"]) {
+    for (const tab of ["JAVASCRIPT", "SERVER 2 SERVER", "ECOMMERCE PLUGINS"]) {
       await expect(
         page.getByRole("tab", { name: new RegExp(tab, "i") }),
         `Tracking Pixel tab "${tab}" missing`,
       ).toBeVisible({ timeout: 30_000 });
     }
+    await expect(
+      page.getByRole("button", { name: /GET JAVASCRIPT/i }),
+    ).toBeVisible();
     await noServerError(page);
   });
 

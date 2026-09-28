@@ -273,6 +273,213 @@ export default class ReconcileSalesPage extends BasePage {
     }, items);
   }
 
+  // --- Reconcile Sales UI: summary tiles, Sales Details dialog, adjustments ---
+
+  /** The six KPI tiles above the table, e.g. { "SALES VOLUME": "$1,300.06" }. */
+  async summaryTiles(): Promise<Record<string, string>> {
+    const text = await this.page.locator("body").innerText();
+    const tiles: Record<string, string> = {};
+    for (const label of ["PUBLISHERS", "SALES", "SALES VOLUME", "COMMISSION", "NETWORK FEE", "TOTAL"]) {
+      const match = text.match(new RegExp(`(?:^|\\n)${label}\\s*\\n\\s*([$\\d,.]+)`));
+      if (match) tiles[label] = match[1];
+    }
+    return tiles;
+  }
+
+  /** Publisher rows of the main table (one per publisher × program). */
+  publisherRows(): Locator {
+    return this.page.locator("tbody tr");
+  }
+
+  /** Open the Sales Details dialog for a main-table row (the "view more" icon). */
+  async openSalesDetails(row: Locator): Promise<Locator> {
+    await row.locator('svg[aria-label="view more"]').click({ force: true });
+    const dialog = this.page
+      .locator(".MuiDialog-paper")
+      .filter({ hasText: "Sales Details" })
+      .last();
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    await expect(dialog.locator("tbody tr").first()).toBeVisible({ timeout: 30_000 });
+    return dialog;
+  }
+
+  static readonly SALE_COLUMNS = [
+    "Sales ID", "Order Number", "Program", "Event date", "Post Date", "Locking Date",
+    "Click ID", "Sale Amount", "Commission", "Adjustments", "Total Commissions",
+    "Network Fee", "Total", "Status",
+  ] as const;
+
+  /** Read one sale row of the Sales Details dialog into a header-keyed record. */
+  async readSale(dialog: Locator, row: Locator): Promise<Record<string, string>> {
+    const headers = (await dialog.locator("th").allInnerTexts()).map((h) => h.trim());
+    const cells = (await row.locator("td").allInnerTexts()).map((c) => c.trim());
+    const record: Record<string, string> = {};
+    headers.forEach((h, i) => { if (h) record[h] = cells[i] ?? ""; });
+    return record;
+  }
+
+  /** Sale rows in the dialog whose Status cell reads Pending. */
+  pendingSaleRows(dialog: Locator): Locator {
+    return dialog.locator("tbody tr").filter({ hasText: /Pending/ });
+  }
+
+  /** The sale row with this Sales ID (second cell) inside an open Sales Details dialog. */
+  saleRowById(dialog: Locator, saleId: string): Locator {
+    return dialog.locator("tbody tr").filter({
+      has: this.page.locator("td:nth-child(2)", { hasText: new RegExp(`^\\s*${saleId}\\s*$`) }),
+    });
+  }
+
+  /** Close the Sales Details dialog (its "X"; Escape does not always close it). */
+  async closeSalesDetails(dialog: Locator) {
+    const close = dialog
+      .locator("button")
+      .filter({ has: this.page.locator('svg[data-testid="CloseIcon"]') })
+      .first();
+    if (await close.isVisible().catch(() => false)) await close.click();
+    else await this.page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden({ timeout: 15_000 });
+  }
+
+  /**
+   * Find a Pending sale with a non-zero amount across the publisher rows.
+   * Returns the open dialog, the sale row and the parsed record.
+   */
+  async findPendingSale(): Promise<{ dialog: Locator; sale: Locator; record: Record<string, string> }> {
+    const rows = this.publisherRows().filter({ hasText: /\$[1-9][\d,]*\.\d{2}/ });
+    const count = await rows.count();
+    for (let i = 0; i < count; i++) {
+      const dialog = await this.openSalesDetails(rows.nth(i));
+      const pending = this.pendingSaleRows(dialog);
+      const n = await pending.count();
+      for (let j = 0; j < n; j++) {
+        const record = await this.readSale(dialog, pending.nth(j));
+        if (Number(record["Sale Amount"].replace(/[$,]/g, "")) > 0) {
+          return { dialog, sale: pending.nth(j), record };
+        }
+      }
+      await this.closeSalesDetails(dialog);
+    }
+    throw new Error("no Pending sale with a non-zero amount this month");
+  }
+
+  /**
+   * Change a sale's amount through the "Sale Adjustments" dialog (the pencil
+   * on the sale row; the "more" pencil is the status menu). Waits for the
+   * confirmation toast.
+   */
+  async adjustSaleAmount(saleRow: Locator, newAmount: number, reason: string) {
+    await saleRow
+      .locator('button:not([aria-label="more"])')
+      .filter({ has: this.page.locator('svg[data-testid="EditIcon"]') })
+      .first()
+      .click();
+    const dialog = this.page
+      .locator(".MuiDialog-paper")
+      .filter({ hasText: "Sale Adjustments" })
+      .last();
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
+
+    // Reason is a free-text autocomplete (options: "Incorrect sale amount",
+    // "Missing sale amount", "Other"); a typed value is accepted as-is.
+    const reasonField = dialog.locator('input[name="reason"]');
+    await reasonField.click();
+    await reasonField.fill(reason);
+    const option = this.page
+      .getByRole("option")
+      .filter({ hasText: new RegExp(`^${this.escapeRegExp(reason)}$`, "i") })
+      .first();
+    if (await option.isVisible().catch(() => false)) await option.click();
+    await dialog.locator('input[name="saleAmount"]').fill(String(newAmount));
+
+    // Anchor on the save request itself; the toast ("Sale amount updated
+    // successfully") is short-lived and easy to miss.
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (r) => /UpdateSaleAdjustmentAmount/i.test(r.url()) && r.request().method() === "POST",
+        { timeout: 30_000 },
+      ),
+      dialog.getByRole("button", { name: /^Submit$/i }).click(),
+    ]);
+    expect(response.status(), "UpdateSaleAdjustmentAmount failed").toBe(200);
+    await expect(dialog).toBeHidden({ timeout: 15_000 });
+  }
+
+  // --- API Reconcile drawer: token, tracking-id lookup, real POST ------------
+
+  private apiDrawer(): Locator {
+    return this.page
+      .locator(".MuiDialog-paper, .MuiDrawer-paper")
+      .filter({ hasText: "API Reconciliation" })
+      .last();
+  }
+
+  /** The Bearer token the drawer displays under Authentication. */
+  async readApiToken(): Promise<string> {
+    const text = await this.apiDrawer().innerText();
+    const match = text.match(/Bearer\s+(eyJ[\w-]+\.[\w-]+\.[\w-]+)/);
+    if (!match) throw new Error("API Reconciliation drawer shows no Bearer token");
+    return match[1];
+  }
+
+  /**
+   * The StatusToUpdate values the drawer documents, read from its own text
+   * ("Approved, Denied, Hold, DeniedTest, or Pending") so the API test sends
+   * exactly what the documentation offers an integrator.
+   */
+  async documentedStatuses(): Promise<string[]> {
+    const text = await this.apiDrawer().innerText();
+    const fromField = text.slice(Math.max(0, text.indexOf("StatusToUpdate")));
+    const match = fromField.match(/((?:[A-Z][A-Za-z]*,\s*)+or\s+[A-Z][A-Za-z]*)/);
+    if (!match) throw new Error("API Reconciliation drawer lists no StatusToUpdate values");
+    return match[1].split(/,\s*(?:or\s+)?/).map((s) => s.trim()).filter(Boolean);
+  }
+
+  /** Use the drawer's program lookup to read a program's Advertiser Tracking ID. */
+  async lookupTrackingId(programName: string): Promise<string> {
+    const drawer = this.apiDrawer();
+    const field = drawer.locator('input[name="programName"]');
+    // The lookup is an autocomplete whose result loads asynchronously; retry
+    // the selection once if the id has not rendered.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await field.click();
+      await field.fill(programName);
+      await this.page.getByRole("option", { name: programName, exact: true }).first().click();
+      await expect(field).toHaveValue(programName);
+      const shown = await expect(drawer)
+        .toContainText(/Advertiser Tracking ID\s*[0-9A-Fa-f-]{36}/, { timeout: 30_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (shown) break;
+    }
+    const text = await drawer.innerText();
+    const match = text.match(/Advertiser Tracking ID\s*([0-9A-Fa-f-]{36})/);
+    if (!match) throw new Error(`no Advertiser Tracking ID shown for "${programName}"`);
+    return match[1];
+  }
+
+  /**
+   * POST to the public reconciliation endpoint exactly as an integrator
+   * (Postman) would: outside the browser session, Bearer token only.
+   */
+  async uploadReconciledSales(items: ApiReconcileItem[], token: string | null) {
+    const response = await this.page.request.post(
+      appUrl("/api/SaleReconciliation/UploadReconciledSales"),
+      {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Content-Type": "application/json",
+        },
+        data: items,
+        failOnStatusCode: false,
+      },
+    );
+    const text = await response.text();
+    let body: any = null;
+    try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+    return { status: response.status(), body };
+  }
+
   async openApiReconcileDrawer() {
     await this.apiReconcileButton.click();
     await expect(this.page.getByText("API Reconciliation")).toBeVisible({

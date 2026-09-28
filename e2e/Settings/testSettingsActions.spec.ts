@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { AUTH_FILE, appUrl } from "../../config/environment";
 import { dismissPaymentReminderIfPresent } from "../../utility/appActions";
+import AdvertiserSetupPage, { PROGRAM_TABS } from "../../pages/AdvertiserSetupPage";
 
 /**
  * Settings — My Account save (a reversible phone-number round-trip) and the
@@ -54,19 +55,16 @@ test.describe("Settings - My Account + Advertiser Setup", () => {
   test("Advertiser Setup: all 5 sub-tabs open without error @smoke", async ({
     page,
   }) => {
-    await page.goto(appUrl("/app/settings/advertisersetup"), {
-      waitUntil: "domcontentloaded",
-    });
-    await dismissPaymentReminderIfPresent(page);
+    // The tabs are inside the wizard's "Create a Program" step.
+    const setup = new AdvertiserSetupPage(page);
+    await setup.goto();
+    await setup.goToIntroduction();
+    await setup.continueButton.click(); // → Select a Plan
+    await expect(setup.planCard("Self-Managed")).toBeVisible({ timeout: 30_000 });
+    await setup.continueButton.click(); // → Create a Program
 
-    for (const tab of [
-      "GENERAL",
-      "PROGRAM DEFAULTS",
-      "ADVANCED COMMISSIONS",
-      "PUBLISHER APPROVAL CRITERIA",
-      "SEARCH KEYWORDS",
-    ]) {
-      const t = page.getByRole("tab", { name: new RegExp(tab, "i") });
+    for (const tab of PROGRAM_TABS) {
+      const t = setup.programTab(tab);
       await t.click();
       await expect(t).toHaveAttribute("aria-selected", "true", {
         timeout: 15_000,

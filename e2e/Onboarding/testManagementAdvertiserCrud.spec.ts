@@ -40,6 +40,40 @@ test.describe("Management - advertiser detail CRUD @write", () => {
     console.log(`advertiser ${advertiserId} <${advertiser.email}>`);
   });
 
+  test("search by advertiser ID opens the same record with the signup data @blocker", async ({
+    page,
+  }) => {
+    expect(advertiserId, "registration step did not complete").toBeTruthy();
+
+    const management = new ManagementAdvertiserPage(page);
+    const foundId = await management.searchAndOpen(advertiserId);
+    expect(foundId).toBe(advertiserId);
+
+    // Company information entered at signup is on the record.
+    const body = page.locator("body");
+    await expect(body).toContainText(advertiser.companyName, { timeout: 30_000 });
+    // The portal normalizes the URL with a trailing slash.
+    const stripSlash = (u: string) => u.replace(/\/+$/, "");
+    expect(stripSlash(await management.readAdvertiserWebsite())).toBe(
+      stripSlash(advertiser.websiteUrl),
+    );
+
+    // A fresh, unverified registration sits in an onboarding status. (Read it
+    // from the Details tab before switching tabs — it lives in "More Details".)
+    const status = await management.readStatus();
+    console.log(`initial status: "${status}"`);
+    expect(status, `unexpected initial status "${status}"`).toMatch(
+      /pending|unverified|new|initial setup|collect payment/i,
+    );
+
+    // Contact information: the registering user is listed under Users.
+    const usersTab = page.getByText("Users", { exact: true }).first();
+    if (await usersTab.isVisible().catch(() => false)) await usersTab.click();
+    await expect(body).toContainText(advertiser.email, { timeout: 30_000 });
+    await expect(body).toContainText(advertiser.firstName);
+    await expect(body).toContainText(advertiser.lastName);
+  });
+
   test("update Advertiser Information (website) and it persists @crud", async ({
     page,
   }) => {

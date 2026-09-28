@@ -108,13 +108,14 @@ export default class ManagementAdvertiserPage extends BasePage {
     await this.page.keyboard.press("Enter");
 
     // Results render as table rows; the id in the first cell links to the
-    // advertiser detail route (/advertiser/{id}). Read the id from that link
-    // and open the detail directly.
+    // advertiser detail route (/advertiser/{id}[/details]). The redesigned
+    // overview (Sep 2026) renders the id as "#1062735", so allow the hash.
+    // Read the id from that link and open the detail directly.
     const detailLink = this.page
       .locator("tbody tr")
       .filter({ hasText: term })
       .locator('a[href^="/advertiser/"]')
-      .filter({ hasText: /^\d+$/ })
+      .filter({ hasText: /^#?\d+$/ })
       .first();
 
     await expect(

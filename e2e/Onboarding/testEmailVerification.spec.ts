@@ -54,9 +54,25 @@ test.describe("Onboarding - email verification and per-stage access @write", () 
     });
 
     console.log(`mail received: "${mail.subject}" at ${mail.receivedTime}`);
+    console.log(`mail sender: "${mail.fromName}" <${mail.fromAddress}>`);
     console.log(`verification link: ${mail.link.slice(0, 120)}...`);
 
     expect(mail.to.toLowerCase()).toContain(advertiser.email.toLowerCase());
+
+    // The mail must be identifiable as FuseTwo's. On staging it arrives as
+    // "The FuseTwo Team" <advertise=fusetwo.com@...flexoffers.com> with the
+    // subject "Verify Your Email"; the relay address is why the sender is
+    // matched on "fusetwo" rather than on an exact domain.
+    const sender = `${mail.fromName} <${mail.fromAddress}>`;
+    expect(
+      sender,
+      `verification e-mail did not come from FuseTwo (sender: ${sender})`,
+    ).toMatch(/fusetwo/i);
+    expect(
+      mail.subject,
+      `subject does not read as a verification request: "${mail.subject}"`,
+    ).toMatch(/verify|verification|fusetwo/i);
+
     expect(mail.link, "no verification link in the e-mail").toMatch(
       /^https?:\/\//,
     );
@@ -79,6 +95,29 @@ test.describe("Onboarding - email verification and per-stage access @write", () 
     });
     await page.waitForTimeout(6_000);
     console.log(`verification link resolved to ${page.url()}`);
+
+    // The redirect must end on the app's confirmation page, which announces
+    // the success and offers a way on to the account status (captured on
+    // staging 2026-09-24: /emailconfirmation?userref=..., "Your email has
+    // been verified!", button "Check account status").
+    await expect(
+      page,
+      "the verification link did not resolve to the app's e-mail confirmation page",
+    ).toHaveURL(/\/emailconfirmation/i);
+    await expect(
+      page.getByRole("heading", { name: /email has been verified/i }),
+      "the confirmation page did not announce a verified e-mail",
+    ).toBeVisible();
+    // The call to action is a link wrapping a button, so both roles match.
+    await expect(
+      page
+        .getByRole("button", { name: /check account status/i })
+        .or(page.getByRole("link", { name: /check account status/i }))
+        .first(),
+    ).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(
+      /invalid|expired|error/i,
+    );
 
     const loginPage = new LoginPage(page);
     await loginPage.goto();

@@ -1,6 +1,6 @@
 // navigationUtils.ts
 import { Locator, Page } from '@playwright/test';
-import { installPaymentReminderAutoDismiss } from './appActions';
+import { installPaymentReminderAutoDismiss, installTermsAutoAccept } from './appActions';
 let shortDelay = 2000;
 
 export async function navigateToHome(page: Page) {
@@ -13,6 +13,7 @@ export async function navigateToHome(page: Page) {
   // Arm the payment-reminder auto-dismiss for the whole test so an unexpected
   // pop-up can never block the run (it appears on a random subset of loads).
   await installPaymentReminderAutoDismiss(page).catch(() => {});
+  await installTermsAutoAccept(page).catch(() => {});
 }
 
 export async function clickWithRetry(

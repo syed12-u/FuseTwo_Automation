@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import CampaignPage from "../../pages/CampaignPage";
 import { AUTH_FILE, appUrl, PATHS } from "../../config/environment";
 import { dismissPaymentReminderIfPresent } from "../../utility/appActions";
 
@@ -57,6 +58,23 @@ test.describe("Campaigns - Add Campaign form", () => {
         `required field "${label}" is missing from the Add Campaign form`,
       ).toBeVisible({ timeout: 30_000 });
     }
+  });
+
+  test("the Active/Expire Time pickers keep the chosen time @crud", async ({
+    page,
+  }) => {
+    await page.goto(appUrl(`${PATHS.campaigns}/new`), {
+      waitUntil: "domcontentloaded",
+    });
+    await dismissPaymentReminderIfPresent(page);
+
+    // Both fields are read-only and driven by the clock dialog; nothing is
+    // saved here — only that the dialog writes the picked time into the field.
+    const campaigns = new CampaignPage(page);
+    await campaigns.pickTime("activeTime", "09:30 AM");
+    await campaigns.pickTime("expiryTime", "11:59 PM");
+    await expect(page.locator('[name="activeTime"]')).toHaveValue("09:30 AM");
+    await expect(page.locator('[name="expiryTime"]')).toHaveValue("11:59 PM");
   });
 
   test("an empty form cannot advance past step 1 @crud", async ({ page }) => {

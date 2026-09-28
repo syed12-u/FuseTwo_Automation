@@ -6,6 +6,7 @@ import {
   env,
   requireAdvertiserCredentials,
 } from "../../config/environment";
+import { acceptTermsIfPresent } from "../../utility/appActions";
 
 setup(
   `Authenticate With Advertiser Max Login (${env.name})`,
@@ -28,6 +29,10 @@ setup(
     });
     await expect(page).not.toHaveURL(new RegExp(PATHS.signin, "i"));
     await expect(page.getByText(/needs to be verified/i)).toHaveCount(0);
+
+    // Accept the Terms modal once here; until it is accepted it covers every
+    // page and hides the app from role-based locators in every suite.
+    await acceptTermsIfPresent(page);
 
     await page.context().storageState({ path: AUTH_FILE });
   },

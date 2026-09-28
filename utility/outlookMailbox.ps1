@@ -86,10 +86,20 @@ while ((Get-Date) -lt $deadline) {
       $allLinks += ($m.Groups[1].Value -replace '&amp;', '&')
     }
 
+    # Sender, so tests can prove the mail really came from FuseTwo. The SMTP
+    # address is what Outlook shows for an internet sender (SenderEmailType
+    # "SMTP"); the display name is "The FuseTwo Team" on the verification mail.
+    $fromName = ''
+    try { $fromName = [string]$message.SenderName } catch { $fromName = '' }
+    $fromAddress = ''
+    try { $fromAddress = [string]$message.SenderEmailAddress } catch { $fromAddress = '' }
+
     Write-Result @{
       found        = $true
       subject      = [string]$message.Subject
       to           = $to
+      fromName     = $fromName
+      fromAddress  = $fromAddress
       receivedTime = $message.ReceivedTime.ToString('o')
       verifyLinks  = @($verifyLinks | Select-Object -Unique)
       linkCount    = $allLinks.Count

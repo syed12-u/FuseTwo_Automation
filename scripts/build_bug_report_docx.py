@@ -83,7 +83,7 @@ BUGS = [
         ],
         "Registration is blocked and stays on step 1 with a CAPTCHA error.",
         "Registration advances to step 2 (Company Information) despite the wrong CAPTCHA. "
-        "Ticket #681 is marked Done on the board but still reproduces on dev.",
+        "Item #681 is marked Done on the board but still reproduces on dev.",
         "Automated: e2e/Onboarding/testSignup.spec.ts 'a wrong CAPTCHA is rejected'.",
         None,
     ),

@@ -126,6 +126,9 @@ export const PATHS = {
   reportClicksSummary: "/app/reports/clickssummary",
   reportClicksDetailed: "/app/reports/clicksdetailed",
   myAccount: "/app/settings/myaccount",
+  conversionTracking: "/app/settings/trackingpixel",
+  advertiserSetup: "/app/settings/advertisersetup",
+  trackingDiagnosis: "/app/support/tracking-diagnosis",
   helpDesk: "/app/support/helpdesk",
   terms: "/terms",
   privacy: "/privacy",
@@ -139,6 +142,12 @@ const managementBaseUrl = normalizeOrigin(
 const controlBaseUrl = normalizeOrigin(
   read("CONTROL_BASE_URL") ?? "https://control.corp.flexoffers.com",
   "CONTROL_BASE_URL",
+);
+// Public marketing website (WordPress), used by the website specs. Staging
+// is www.staging.fusetwo.com; prod and dev fall back to the live site.
+const websiteBaseUrl = normalizeOrigin(
+  read("WEBSITE_BASE_URL") ?? "https://www.fusetwo.com",
+  "WEBSITE_BASE_URL",
 );
 
 /** Absolute URL on the advertiser app for the given path. */
@@ -156,6 +165,11 @@ export function controlUrl(pathname: string): string {
   return new URL(pathname, controlBaseUrl).toString();
 }
 
+/** Absolute URL on the public marketing website for the given path. */
+export function websiteUrl(pathname: string): string {
+  return new URL(pathname, websiteBaseUrl).toString();
+}
+
 export const env = {
   name: ENV_NAME,
   isProd: ENV_NAME === "prod",
@@ -163,6 +177,7 @@ export const env = {
   appBaseUrl,
   managementBaseUrl,
   controlBaseUrl,
+  websiteBaseUrl,
 
   signinUrl: appUrl(PATHS.signin),
   signupUrl: appUrl(PATHS.signup),

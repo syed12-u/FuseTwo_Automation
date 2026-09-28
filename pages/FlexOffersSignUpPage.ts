@@ -22,6 +22,36 @@ export interface CreatedAdvertiser {
   websiteUrl: string;
 }
 
+/** What step 1 typed in, so a test can assert the form kept it. */
+export interface UserDetails
+  extends Pick<CreatedAdvertiser, "email" | "password" | "firstName" | "lastName"> {
+  /** The option text chosen in the Security Question dropdown. */
+  securityQuestion: string;
+  securityAnswer: string;
+}
+
+/** What step 2 typed in, so a test can assert the form kept it. */
+export interface CompanyDetails
+  extends Pick<CreatedAdvertiser, "companyName" | "websiteUrl"> {
+  address: string;
+  /** The option text chosen in the Country dropdown. */
+  country: string;
+  city: string;
+  /** The option text chosen in the State dropdown. */
+  state: string;
+  zip: string;
+  phone: string;
+}
+
+/**
+ * Validation text the signup form shows under a mismatched confirmation
+ * field (captured on staging 2026-09-24).
+ */
+export const SIGNUP_VALIDATION = {
+  emailMismatch: "Email addresses must match.",
+  passwordMismatch: "Passwords must match.",
+} as const;
+
 export default class SignUpPage extends BasePage {
   readonly firstName: Locator;
   readonly lastName: Locator;
@@ -34,6 +64,8 @@ export default class SignUpPage extends BasePage {
   readonly captcha: Locator;
   readonly captchaCanvas: Locator;
   readonly continueBtn: Locator;
+  readonly confirmEmailError: Locator;
+  readonly confirmPasswordError: Locator;
 
   readonly companyName: Locator;
   readonly websiteUrl: Locator;
@@ -44,7 +76,10 @@ export default class SignUpPage extends BasePage {
   readonly zip: Locator;
   readonly phone: Locator;
   readonly advertisingAgency: Locator;
+  readonly agencyUrl: Locator;
+  readonly promoCode: Locator;
   readonly platform: Locator;
+  readonly platformName: Locator;
   readonly affiliate: Locator;
   readonly affiliateNetwork: Locator;
   readonly approvedPublishers: Locator;
@@ -68,6 +103,11 @@ export default class SignUpPage extends BasePage {
     this.captcha = page.locator('input[name="captcha"]');
     this.captchaCanvas = page.locator("canvas").first();
     this.continueBtn = page.getByRole("button", { name: "Continue" });
+    // MUI renders the validation message as a <p class="Mui-error"> helper
+    // inside the same form control as the input, and flags the input with
+    // aria-invalid="true".
+    this.confirmEmailError = this.fieldError("confirmEmailAddress");
+    this.confirmPasswordError = this.fieldError("confirmPassword");
 
     // Step 2 field names as the app actually renders them: website (not
     // websiteUrl), address1 (not address), zipCode (not zip). The dropdowns are
@@ -81,7 +121,12 @@ export default class SignUpPage extends BasePage {
     this.zip = page.locator('input[name="zipCode"]');
     this.phone = page.locator('input[name="phone"]');
     this.advertisingAgency = page.locator('input[name="agencyQuestion"]');
+    // Shown only when the agency answer is "Yes".
+    this.agencyUrl = page.locator('input[name="agencyUrl"]');
+    this.promoCode = page.locator('input[name="promoCode"]');
     this.platform = page.locator('input[name="websitePlatform"]');
+    // Shown only when the platform is "Other".
+    this.platformName = page.locator('input[name="websitePlatformName"]');
     // Step 3 - "Do you currently have an affiliate program?"
     this.affiliate = page.locator('input[name="IsUsingAnotherNetwork"]');
     this.affiliateNetwork = page.locator('input[name="Networks"]');
@@ -98,6 +143,13 @@ export default class SignUpPage extends BasePage {
   async goto() {
     await this.navigateTo(appUrl(PATHS.signup));
     await expect(this.firstName).toBeVisible();
+  }
+
+  /** The error helper text shown under the input with the given name. */
+  fieldError(inputName: string): Locator {
+    return this.page.locator(
+      `.MuiFormControl-root:has(input[name="${inputName}"]) p.MuiFormHelperText-root.Mui-error`,
+    );
   }
 
   /**
@@ -118,52 +170,69 @@ export default class SignUpPage extends BasePage {
 
     // The canvas mounts slightly before the component state holding the answer
     // is populated, so a single read intermittently comes back empty. Poll for
-    // up to ~15s before giving up.
-    for (let attempt = 0; attempt < 30; attempt++) {
+    // up to ~30s before giving up (a loaded machine has needed more than the
+    // original 15s).
+    for (let attempt = 0; attempt < 60; attempt++) {
       const answer = await this.extractCaptchaAnswer();
       if (answer) return answer;
       await this.page.waitForTimeout(500);
     }
+    console.log(
+      `CAPTCHA answer not found; page state: ${JSON.stringify(
+        await this.describeCaptchaState(),
+      )}`,
+    );
     return null;
   }
 
   private async extractCaptchaAnswer(): Promise<string | null> {
     return this.page.evaluate(() => {
-      const canvas = document.querySelector("canvas");
-      if (!canvas) return null;
+      // Every canvas is examined (a late-loading widget can insert one ahead
+      // of the CAPTCHA), and both React fiber trees are read: the DOM node
+      // keeps a reference to the fiber that created it, which may be the
+      // stale "alternate" after a re-render.
+      const canvases = Array.from(document.querySelectorAll("canvas"));
+      if (canvases.length === 0) return null;
 
       // Collect every five-character string held in the surrounding component
       // state. React's own generated element ids (_r_3_) are the same length,
       // so they are filtered out; the CAPTCHA is then the most frequently
       // repeated remaining candidate.
       const counts = new Map<string, number>();
-      let node: Element | null = canvas;
 
-      for (
-        let depth = 0;
-        node && depth < 10;
-        depth++, node = node.parentElement
-      ) {
-        const fiberKey = Object.keys(node).find((k) =>
-          k.startsWith("__reactFiber$"),
-        );
-        if (!fiberKey) continue;
-
-        let fiber = (node as unknown as Record<string, any>)[fiberKey];
-        for (let up = 0; fiber && up < 15; up++) {
-          let hook = fiber.memoizedState;
-          for (let i = 0; hook && i < 20; i++) {
-            const value = hook.memoizedState;
-            if (
-              typeof value === "string" &&
-              value.length === 5 &&
-              !/^_r_.*_$/.test(value)
-            ) {
-              counts.set(value, (counts.get(value) ?? 0) + 1);
-            }
-            hook = hook.next;
+      const collect = (fiber: any) => {
+        let hook = fiber?.memoizedState;
+        for (let i = 0; hook && i < 20; i++) {
+          const value = hook.memoizedState;
+          if (
+            typeof value === "string" &&
+            value.length === 5 &&
+            !/^_r_.*_$/.test(value)
+          ) {
+            counts.set(value, (counts.get(value) ?? 0) + 1);
           }
-          fiber = fiber.return;
+          hook = hook.next;
+        }
+      };
+
+      for (const canvas of canvases) {
+        let node: Element | null = canvas;
+        for (
+          let depth = 0;
+          node && depth < 10;
+          depth++, node = node.parentElement
+        ) {
+          const fiberKey = Object.keys(node).find((k) =>
+            k.startsWith("__reactFiber$"),
+          );
+          if (!fiberKey) continue;
+
+          let fiber = (node as unknown as Record<string, any>)[fiberKey];
+          for (let up = 0; fiber && up < 15; up++) {
+            collect(fiber);
+            collect(fiber.alternate);
+            fiber = fiber.return;
+          }
         }
       }
 
@@ -179,6 +248,24 @@ export default class SignUpPage extends BasePage {
     });
   }
 
+  /** Diagnostics for the failure message when the CAPTCHA cannot be read. */
+  private async describeCaptchaState(): Promise<Record<string, unknown>> {
+    return this.page
+      .evaluate(() => ({
+        url: location.href,
+        canvases: Array.from(document.querySelectorAll("canvas")).map(
+          (c) => `${c.width}x${c.height}`,
+        ),
+        dialogs: Array.from(document.querySelectorAll('[role="dialog"]')).map(
+          (d) => (d.textContent ?? "").trim().slice(0, 80),
+        ),
+        bodyStart: (document.body.innerText ?? "")
+          .replace(/\s+/g, " ")
+          .slice(0, 200),
+      }))
+      .catch((e) => ({ error: String(e) }));
+  }
+
   async fillCaptcha(): Promise<string> {
     const answer = await this.readCaptchaAnswer();
     if (!answer) {
@@ -191,14 +278,18 @@ export default class SignUpPage extends BasePage {
     return answer;
   }
 
-  /** Step 1. Returns the identity of the account being created. */
+  /**
+   * Step 1. Returns the identity of the account being created plus every value
+   * typed, so the caller can assert the form kept them.
+   *
+   * `confirmEmail` / `confirmPassword` default to the real values; pass a
+   * different one to drive the mismatch validation.
+   */
   async fillUserDetails(
     overrides: Partial<
       Pick<CreatedAdvertiser, "email" | "firstName" | "lastName">
-    > = {},
-  ): Promise<
-    Pick<CreatedAdvertiser, "email" | "password" | "firstName" | "lastName">
-  > {
+    > & { confirmEmail?: string; confirmPassword?: string } = {},
+  ): Promise<UserDetails> {
     const email = overrides.email ?? uniqueSignupEmail();
     const firstName = overrides.firstName ?? "QAauto";
     const lastName = overrides.lastName ?? "Tester";
@@ -206,17 +297,35 @@ export default class SignUpPage extends BasePage {
     await this.firstName.fill(firstName);
     await this.lastName.fill(lastName);
     await this.email.fill(email);
-    await this.confirmEmail.fill(email);
+    await this.confirmEmail.fill(overrides.confirmEmail ?? email);
     await this.password.fill(PASSWORD);
-    await this.confirmPassword.fill(PASSWORD);
+    await this.confirmPassword.fill(overrides.confirmPassword ?? PASSWORD);
 
-    await this.securityQuestion.click();
-    await this.page.locator('li[role="option"]').first().click();
+    const securityQuestion = await this.chooseSecurityQuestion();
     await this.securityAnswer.fill(SECURITY_ANSWER);
 
     await this.fillCaptcha();
 
-    return { email, password: PASSWORD, firstName, lastName };
+    return {
+      email,
+      password: PASSWORD,
+      firstName,
+      lastName,
+      securityQuestion,
+      securityAnswer: SECURITY_ANSWER,
+    };
+  }
+
+  /**
+   * Pick the first security question and return its text. The dropdown is an
+   * MUI Autocomplete, so the chosen option text becomes the input's value.
+   */
+  async chooseSecurityQuestion(): Promise<string> {
+    await this.securityQuestion.click();
+    const option = this.page.locator('li[role="option"]').first();
+    const text = (await option.textContent())?.trim() ?? "";
+    await option.click();
+    return text;
   }
 
   async continueToCompanyStep() {
@@ -224,39 +333,76 @@ export default class SignUpPage extends BasePage {
     await expect(this.companyName).toBeVisible({ timeout: 30_000 });
   }
 
-  /** Step 2. Returns the company identity used to find the record later. */
+  /**
+   * Step 2. Returns the company identity used to find the record later, plus
+   * every address value typed so the caller can assert the form kept them.
+   */
   async fillCompanyDetails(
-    overrides: Partial<
-      Pick<CreatedAdvertiser, "companyName" | "websiteUrl">
-    > = {},
-  ): Promise<Pick<CreatedAdvertiser, "companyName" | "websiteUrl">> {
+    overrides: Partial<Pick<CreatedAdvertiser, "companyName" | "websiteUrl">> & {
+      /** "Yes" reveals the brands-represented URL field. */
+      agency?: "Yes" | "No";
+      agencyUrl?: string;
+      promoCode?: string;
+      /** "Other" reveals the free-text Platform Name field. */
+      platform?: string;
+      platformName?: string;
+    } = {},
+  ): Promise<CompanyDetails> {
     const companyName = overrides.companyName ?? uniqueCompanyName();
     const websiteUrl =
       overrides.websiteUrl ??
       `https://www.qa-${Math.random().toString(36).slice(2, 8)}.com`;
+    const address = "1234 Test Street";
+    const city = "Lake";
+    const state = "Alaska";
 
     await this.companyName.fill(companyName);
     await this.websiteUrl.fill(websiteUrl);
-    await this.address.fill("1234 Test Street");
+    await this.address.fill(address);
 
+    // Country and State are MUI Autocompletes: the option text becomes the
+    // input value, so it is captured here for the caller to assert on.
     await this.country.click();
-    await this.page.locator('li[role="option"]').first().click();
+    const countryOption = this.page.locator('li[role="option"]').first();
+    const country = (await countryOption.textContent())?.trim() ?? "";
+    await countryOption.click();
 
-    await this.city.fill("Lake");
+    await this.city.fill(city);
 
     await this.state.click();
-    await this.page.getByRole("option", { name: "Alaska" }).click();
+    await this.page.getByRole("option", { name: state }).click();
 
     await this.zip.fill(ZIP_CODE);
     await this.phone.fill(PHONE_NUMBER);
 
+    const agency = overrides.agency ?? "No";
     await this.advertisingAgency.click();
-    await this.page.getByRole("option", { name: "No", exact: true }).click();
+    await this.page.getByRole("option", { name: agency, exact: true }).click();
+    if (agency === "Yes") {
+      await expect(this.agencyUrl).toBeVisible();
+      await this.agencyUrl.fill(overrides.agencyUrl ?? websiteUrl);
+    }
 
+    if (overrides.promoCode) await this.promoCode.fill(overrides.promoCode);
+
+    const platform = overrides.platform ?? "WordPress.org";
     await this.platform.click();
-    await this.page.getByRole("option", { name: "WordPress.org" }).click();
+    await this.page.getByRole("option", { name: platform, exact: true }).click();
+    if (platform === "Other") {
+      await expect(this.platformName).toBeVisible();
+      await this.platformName.fill(overrides.platformName ?? "QA custom platform");
+    }
 
-    return { companyName, websiteUrl };
+    return {
+      companyName,
+      websiteUrl,
+      address,
+      country,
+      city,
+      state,
+      zip: ZIP_CODE,
+      phone: PHONE_NUMBER,
+    };
   }
 
   /**

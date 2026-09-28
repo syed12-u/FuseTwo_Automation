@@ -163,7 +163,7 @@ SECTIONS = [
     ("4. Programs", "Filter bar hidden when there are 0 programs", "UI", "Gap", "Bug #542"),
     ("4. Programs", "Commission Type label styling", "UI", "Gap", "Bug #688"),
     ("4. Programs", "Tracking diagnosis tool", "Functional", "Gap", ""),
-    ("4. Programs", "Programs API contract", "API", "Partial", "Ticket 371"),
+    ("4. Programs", "Programs API contract", "API", "Partial", "Item 371"),
     ("4. Programs", "Program defaults save and re-read", "CRUD-U", "Gap", ""),
     ("4. Programs", "Listing and creation entry point exposed", "Functional", "Automated", "Executive regression"),
 
@@ -247,7 +247,7 @@ SECTIONS = [
     ("13. Settings & Support", "Change password then sign in again", "CRUD-U", "Gap", ""),
     ("13. Settings & Support", "Sub-user add / edit / delete", "CRUD-CUD", "Gap", ""),
     ("13. Settings & Support", "Notification preferences update", "CRUD-U", "Gap", ""),
-    ("13. Settings & Support", "Help Desk: create ticket, list, read", "CRUD-CR", "Gap", ""),
+    ("13. Settings & Support", "Help Desk: create support request, list, read", "CRUD-CR", "Gap", ""),
     ("13. Settings & Support", "Terms page renders (no blank / 500)", "Functional", "Gap", "Bug #725"),
     ("13. Settings & Support", "Privacy Policy renders with real dates", "Content", "Gap", ""),
 
@@ -264,7 +264,7 @@ SECTIONS = [
     ("14. Management portal", "Advertiser approve / reject", "CRUD-U", "Gap", ""),
     ("14. Management portal", "Pricing Schedule matches the advertiser agreement", "Data", "Gap", "Bug #762"),
     ("14. Management portal", "No legacy FlexOffers.com branding", "Content", "Gap", "Bug #764"),
-    ("14. Management portal", "Advertiser Details Programs workflow exposed", "Functional", "Automated", "Ticket 371"),
+    ("14. Management portal", "Advertiser Details Programs workflow exposed", "Functional", "Automated", "Item 371"),
 
     ("15. Cross-cutting", "12 routes load without auth redirect or 5xx", "Smoke", "Automated", "Navigation suite"),
     ("15. Cross-cutting", "Critical APIs: status, latency and schema", "API", "Automated", ""),

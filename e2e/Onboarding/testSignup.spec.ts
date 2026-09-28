@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
-import SignUpPage from "../../pages/FlexOffersSignUpPage";
+import SignUpPage, {
+  SIGNUP_VALIDATION,
+} from "../../pages/FlexOffersSignUpPage";
 import { uniqueSignupEmail } from "../../fixtures/onboardingData";
 import { PASSWORD, SECURITY_ANSWER } from "../../fixtures/testConstants";
 
@@ -22,6 +24,137 @@ test.describe("Onboarding - registration", () => {
     await expect(page.getByText(/thank you/i).first()).toBeVisible({
       timeout: 60_000,
     });
+  });
+
+  test("company step: agency Yes, promo code and Other platform reveal their fields @write", async ({
+    page,
+  }) => {
+    const signUp = new SignUpPage(page);
+    await signUp.goto();
+    await signUp.fillUserDetails();
+    await signUp.continueToCompanyStep();
+
+    // Conditional fields are hidden until their trigger answer is chosen.
+    await expect(signUp.agencyUrl).toBeHidden();
+    await expect(signUp.platformName).toBeHidden();
+
+    const company = await signUp.fillCompanyDetails({
+      agency: "Yes",
+      promoCode: "QAPROMO",
+      platform: "Other",
+      platformName: "QA custom platform",
+    });
+    await expect(signUp.agencyUrl).toHaveValue(company.websiteUrl);
+    await expect(signUp.promoCode).toHaveValue("QAPROMO");
+    await expect(signUp.platformName).toHaveValue("QA custom platform");
+
+    // Step 3 must accept the company step with these answers.
+    await signUp.fillProgramDetails();
+    await signUp.submitForm();
+    await expect(page.getByText(/thank you/i).first()).toBeVisible({
+      timeout: 60_000,
+    });
+  });
+
+  test("step 1 and the company step keep every value entered @write", async ({
+    page,
+  }) => {
+    const signUp = new SignUpPage(page);
+    await signUp.goto();
+
+    // Step 1 - the identity fields, including the two dropdown-backed ones.
+    const user = await signUp.fillUserDetails();
+    expect(
+      user.securityQuestion,
+      "no security question option text was captured",
+    ).not.toBe("");
+    await expect(signUp.firstName).toHaveValue(user.firstName);
+    await expect(signUp.lastName).toHaveValue(user.lastName);
+    await expect(signUp.email).toHaveValue(user.email);
+    await expect(signUp.confirmEmail).toHaveValue(user.email);
+    await expect(signUp.securityQuestion).toHaveValue(user.securityQuestion);
+    await expect(signUp.securityAnswer).toHaveValue(user.securityAnswer);
+
+    // Step 2 - the company address block.
+    await signUp.continueToCompanyStep();
+    const company = await signUp.fillCompanyDetails();
+    expect(company.country, "no country option text was captured").not.toBe(
+      "",
+    );
+    await expect(signUp.companyName).toHaveValue(company.companyName);
+    // The website field carries "https://" as a fixed adornment and keeps
+    // only the host part of what was typed.
+    await expect(signUp.websiteUrl).toHaveValue(
+      company.websiteUrl.replace(/^https?:\/\//, ""),
+    );
+    await expect(signUp.address).toHaveValue(company.address);
+    await expect(signUp.country).toHaveValue(company.country);
+    await expect(signUp.city).toHaveValue(company.city);
+    await expect(signUp.state).toHaveValue(company.state);
+    await expect(signUp.zip).toHaveValue(company.zip);
+    await expect(signUp.phone).toHaveValue(company.phone);
+
+    // Nothing was flagged invalid along the way.
+    await expect(page.locator('input[aria-invalid="true"]')).toHaveCount(0);
+  });
+
+  test("a mismatched Confirm Email shows an error and blocks Continue @security", async ({
+    page,
+  }) => {
+    const signUp = new SignUpPage(page);
+    await signUp.goto();
+
+    const user = await signUp.fillUserDetails({
+      confirmEmail: `different.${uniqueSignupEmail()}`,
+    });
+
+    // Validation text as the app renders it, tied to the confirm field only.
+    await expect(signUp.confirmEmailError).toHaveText(
+      SIGNUP_VALIDATION.emailMismatch,
+    );
+    await expect(signUp.confirmEmail).toHaveAttribute("aria-invalid", "true");
+    await expect(signUp.confirmPasswordError).toBeHidden();
+
+    // Continue stays clickable but must not advance to the company step.
+    await signUp.continueBtn.click();
+    await page.waitForTimeout(3_000);
+    await expect(
+      signUp.companyName,
+      `a mismatched Confirm Email advanced to the company step (${user.email})`,
+    ).toBeHidden();
+    await expect(signUp.confirmEmailError).toHaveText(
+      SIGNUP_VALIDATION.emailMismatch,
+    );
+  });
+
+  test("a mismatched Confirm Password shows an error and blocks Continue @security", async ({
+    page,
+  }) => {
+    const signUp = new SignUpPage(page);
+    await signUp.goto();
+
+    const user = await signUp.fillUserDetails({
+      confirmPassword: `${PASSWORD}x`,
+    });
+
+    await expect(signUp.confirmPasswordError).toHaveText(
+      SIGNUP_VALIDATION.passwordMismatch,
+    );
+    await expect(signUp.confirmPassword).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    await expect(signUp.confirmEmailError).toBeHidden();
+
+    await signUp.continueBtn.click();
+    await page.waitForTimeout(3_000);
+    await expect(
+      signUp.companyName,
+      `a mismatched Confirm Password advanced to the company step (${user.email})`,
+    ).toBeHidden();
+    await expect(signUp.confirmPasswordError).toHaveText(
+      SIGNUP_VALIDATION.passwordMismatch,
+    );
   });
 
   test("the CAPTCHA answer is regenerated on every load @security", async ({

@@ -52,6 +52,14 @@ export interface MailFilter {
 export interface VerificationMail {
   subject: string;
   to: string;
+  /**
+   * Sender display name and address, so a test can prove the mail came from
+   * FuseTwo. Observed on staging: name "The FuseTwo Team", address
+   * "advertise=fusetwo.com@<id>.flexoffers.com" (a HubSpot-relayed sender,
+   * which is why the address is matched on "fusetwo" rather than the domain).
+   */
+  fromName: string;
+  fromAddress: string;
   receivedTime: string;
   /**
    * The link behind the "Verify email address" call to action.
@@ -98,6 +106,8 @@ interface OutlookResult {
   error?: string;
   subject?: string;
   to?: string;
+  fromName?: string;
+  fromAddress?: string;
   receivedTime?: string;
   verifyLinks?: string[];
   linkCount?: number;
@@ -157,6 +167,8 @@ async function waitViaOutlook(
   return {
     subject: result.subject ?? "",
     to: result.to ?? recipient,
+    fromName: result.fromName ?? "",
+    fromAddress: result.fromAddress ?? "",
     receivedTime: result.receivedTime ?? "",
     link: links[0],
   };
@@ -233,7 +245,7 @@ async function waitViaGraph(
     const url =
       `${GRAPH}/users/${mailbox}/mailFolders/inbox/messages` +
       `?$top=40&$orderby=receivedDateTime desc` +
-      `&$select=subject,receivedDateTime,toRecipients,body`;
+      `&$select=subject,receivedDateTime,toRecipients,from,body`;
 
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
@@ -264,6 +276,8 @@ async function waitViaGraph(
       return {
         subject: message.subject ?? "",
         to: target,
+        fromName: message.from?.emailAddress?.name ?? "",
+        fromAddress: message.from?.emailAddress?.address ?? "",
         receivedTime: message.receivedDateTime,
         link: links[0],
       };
@@ -386,4 +400,153 @@ export async function waitForMailTo(
   throw new Error(
     `No matching message for ${recipient} within ${timeoutMs / 1000}s.`,
   );
+}
+
+// --------------------------------------------------------------------------
+// Message body
+// --------------------------------------------------------------------------
+
+export interface MailBody {
+  /** The body as readable text: HTML stripped, entities decoded, whitespace collapsed. */
+  text: string;
+  /** The raw HTML body ("" when the message is plain text). */
+  html: string;
+}
+
+/** Turn an HTML body into one line of readable text for substring assertions. */
+export function mailHtmlToText(html: string): string {
+  const entities: Record<string, string> = {
+    amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
+  };
+  return html
+    .replace(/<(style|script|head)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+    .replace(/&([a-z]+);/gi, (m, name) => entities[name.toLowerCase()] ?? m)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// The Outlook reader script only returns headers and links; the body of a
+// matched message is re-read here by subject + received time so that
+// outlookMailbox.ps1 and its callers stay unchanged. Values travel through
+// environment variables rather than the command line to avoid quoting.
+const OUTLOOK_BODY_SCRIPT = `
+$ErrorActionPreference = 'Stop'
+try {
+  $outlook = New-Object -ComObject Outlook.Application
+  $inbox = $outlook.GetNamespace('MAPI').GetDefaultFolder(6)
+} catch {
+  @{ found = $false; error = "Outlook COM unavailable: $($_.Exception.Message)" } | ConvertTo-Json -Compress
+  exit 0
+}
+$target = $env:MB_RECIPIENT.ToLower()
+$subject = [string]$env:MB_SUBJECT
+$received = $null
+try { if ($env:MB_RECEIVED) { $received = [datetime]::Parse($env:MB_RECEIVED) } } catch {}
+$items = $inbox.Items
+$items.Sort('[ReceivedTime]', $true)
+$index = 0
+foreach ($message in $items) {
+  $index++
+  if ($index -gt 60) { break }
+  $to = ''
+  try { $to = [string]$message.To } catch { $to = '' }
+  if (-not $to -or $to.ToLower() -notlike "*$target*") { continue }
+  if ([string]$message.Subject -ne $subject) { continue }
+  if ($received -and [math]::Abs(($message.ReceivedTime - $received).TotalSeconds) -gt 120) { continue }
+  $html = ''
+  $text = ''
+  try { $html = [string]$message.HTMLBody } catch { $html = '' }
+  try { $text = [string]$message.Body } catch { $text = '' }
+  @{ found = $true; html = $html; text = $text } | ConvertTo-Json -Compress -Depth 2
+  exit 0
+}
+@{ found = $false; error = "No message '$subject' to $target found in Outlook." } | ConvertTo-Json -Compress
+`;
+
+/**
+ * Read the body of a message previously located with waitForMailTo /
+ * waitForVerificationMail (matched again by recipient, subject and received
+ * time). Works with both backends.
+ */
+export async function readMailBody(
+  recipient: string,
+  mail: Pick<MailMatch, "subject" | "receivedTime">,
+): Promise<MailBody> {
+  const backend = mailboxBackend();
+  if (!backend) throw new Error(mailboxUnavailableReason());
+
+  if (backend === "outlook") {
+    const { stdout } = await execFileAsync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-EncodedCommand",
+        Buffer.from(OUTLOOK_BODY_SCRIPT, "utf16le").toString("base64"),
+      ],
+      {
+        timeout: 120_000,
+        maxBuffer: 20 * 1024 * 1024,
+        windowsHide: true,
+        env: {
+          ...process.env,
+          MB_RECIPIENT: recipient,
+          MB_SUBJECT: mail.subject,
+          MB_RECEIVED: mail.receivedTime,
+        },
+      },
+    );
+    let result: { found: boolean; error?: string; html?: string; text?: string };
+    try {
+      result = JSON.parse(stdout.trim());
+    } catch {
+      throw new Error(`Could not parse the Outlook body output:\n${stdout.slice(0, 500)}`);
+    }
+    if (!result.found) throw new Error(result.error ?? `No body for "${mail.subject}" in Outlook.`);
+    // Same text shape on both backends: derived from the HTML when there is
+    // one (Outlook's plain Body interleaves "<url>" after every link).
+    const html = result.html ?? "";
+    const text = html.trim()
+      ? mailHtmlToText(html)
+      : (result.text ?? "").replace(/\s+/g, " ").trim();
+    return { text, html };
+  }
+
+  // Graph
+  const target = recipient.toLowerCase();
+  const token = await getAccessToken();
+  const mailbox = encodeURIComponent(env.graph.mailbox);
+  const url =
+    `${GRAPH}/users/${mailbox}/mailFolders/inbox/messages` +
+    `?$top=40&$orderby=receivedDateTime desc` +
+    `&$select=subject,receivedDateTime,toRecipients,body`;
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) {
+    throw new Error(`Graph rejected the mailbox read (HTTP ${response.status}).`);
+  }
+  const json = (await response.json()) as { value: any[] };
+  const wanted = mail.receivedTime ? new Date(mail.receivedTime).getTime() : NaN;
+  for (const message of json.value) {
+    const recipients: string[] = (message.toRecipients ?? []).map((r: any) =>
+      (r.emailAddress?.address ?? "").toLowerCase(),
+    );
+    if (!recipients.includes(target)) continue;
+    if ((message.subject ?? "") !== mail.subject) continue;
+    if (
+      !Number.isNaN(wanted) &&
+      Math.abs(new Date(message.receivedDateTime).getTime() - wanted) > 120_000
+    )
+      continue;
+    const content: string = message.body?.content ?? "";
+    const isHtml = (message.body?.contentType ?? "").toLowerCase() === "html";
+    return {
+      text: isHtml ? mailHtmlToText(content) : content.replace(/\s+/g, " ").trim(),
+      html: isHtml ? content : "",
+    };
+  }
+  throw new Error(`No message "${mail.subject}" to ${recipient} found in ${env.graph.mailbox}.`);
 }

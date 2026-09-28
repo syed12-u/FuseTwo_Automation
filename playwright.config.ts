@@ -1,4 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
+import fs from "fs";
+import path from "path";
 import process from "process";
 
 // Resolves TEST_ENV (dev | staging | prod), loads the matching config/env/*.env
@@ -44,8 +46,26 @@ const ssoArgs = [
 // @write      mutates real data; skipped automatically on prod
 // @known-bug  guards an open defect, so it is expected to fail today. Excluded
 //             from every gating run and reported by the `known-bugs` project.
-const excludedTags = ["@known-bug", ...(env.allowWriteTests ? [] : ["@write"])];
-const excludeTagPattern = new RegExp(excludedTags.join("|"));
+// @pending-review  new scenario written by the daily explorer agent that a QA
+//             lead has not approved yet. Excluded from every run except the
+//             `review` project (npm run review:cases, headed). Approving a case
+//             (npm run approve:cases) removes the tag and adds it to the suite.
+const runAllTests = process.env.RUN_ALL_TESTS === "true";
+const excludedTags = [
+  "@pending-review",
+  ...(runAllTests ? [] : ["@known-bug"]),
+  ...(env.allowWriteTests ? [] : ["@write"]),
+];
+const excludeTagPattern = excludedTags.length ? new RegExp(excludedTags.join("|")) : undefined;
+
+// Optional machine-local additions: extra projects and folders that belong to
+// one QA machine and are not part of the shared suite. The file is not in git
+// (absent on CI), so the shared config works without it. It exports
+// ({ devices, env, ssoArgs, ciBrowserArgs }) => ({ testIgnore, projects }).
+const localConfigFile = path.join(__dirname, "playwright.local.js");
+const local: { testIgnore: RegExp[]; projects: any[] } = fs.existsSync(localConfigFile)
+  ? require(localConfigFile)({ devices, env, ssoArgs, ciBrowserArgs })
+  : { testIgnore: [], projects: [] };
 
 // Print the resolved target once at startup. Without this a run against the
 // wrong environment looks identical in the logs to a correct one.
@@ -53,7 +73,7 @@ console.log(
   `[fusetwo-e2e] TEST_ENV=${env.name}  app=${env.appBaseUrl}  management=${env.managementBaseUrl}  ` +
     `writes=${
       env.allowWriteTests ? "allowed" : "blocked"
-    }  skipping=${excludedTags.join(",")}`,
+    }  allTests=${runAllTests}  skipping=${excludedTags.join(",") || "none"}`,
 );
 
 export default defineConfig({
@@ -97,12 +117,28 @@ export default defineConfig({
     {
       name: "chromium",
       testIgnore: [
-        /Auth[\\/].*GeoLogin\.spec\.ts/,
-        /Auth[\\/].*FlexOffersSignUp\.spec\.ts/,
-        /Accounting[\\/].*\.spec\.ts/,
-        /MessageCenter[\\/].*\.spec\.ts/,
-        /Reporting[\\/]testReporting\.spec\.ts/,
+        ...local.testIgnore,
+        ...(runAllTests
+          ? []
+          : [
+              /Auth[\\/].*GeoLogin\.spec\.ts/,
+              /Auth[\\/].*FlexOffersSignUp\.spec\.ts/,
+              /Accounting[\\/].*\.spec\.ts/,
+              /MessageCenter[\\/].*\.spec\.ts/,
+              /Reporting[\\/]testReporting\.spec\.ts/,
+            ]),
       ],
+      grepInvert: excludeTagPattern,
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+    },
+
+    /* Accounting suites (Reconcile Sales UI + API, adjustment e-mail). Kept
+       out of the day-to-day run because they adjust real sale amounts (each
+       test reverts its own change); run them with npm run test:accounting. */
+    {
+      name: "accounting",
+      testMatch: /Accounting[\\/].*\.spec\.ts/,
       grepInvert: excludeTagPattern,
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["setup"],
@@ -114,7 +150,7 @@ export default defineConfig({
       name: "release-gate",
       grep: /@blocker/,
       grepInvert: excludeTagPattern,
-      testIgnore: [/Auth[\\/].*GeoLogin\.spec\.ts/],
+      testIgnore: [...local.testIgnore, ...(runAllTests ? [] : [/Auth[\\/].*GeoLogin\.spec\.ts/])],
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["setup"],
     },
@@ -124,9 +160,36 @@ export default defineConfig({
     {
       name: "known-bugs",
       grep: /@known-bug/,
+      grepInvert: /@pending-review/,
+      testIgnore: [...local.testIgnore],
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["setup"],
     },
+
+    /* Review of new explorer-agent scenarios (@pending-review), shown in a
+       visible browser, slowed down so each step can be followed. Run with
+       npm run review:cases, then approve / reject with approve:cases. */
+    {
+      name: "review",
+      grep: /@pending-review/,
+      testIgnore: [...local.testIgnore],
+      use: {
+        ...devices["Desktop Chrome"],
+        // Visible and slowed down for the reviewer; the unattended explorer
+        // agent sets REVIEW_HEADLESS=true to run the same project headless.
+        headless: process.env.REVIEW_HEADLESS === "true",
+        viewport: { width: 1440, height: 900 },
+        launchOptions: {
+          args: [...ssoArgs, ...ciBrowserArgs],
+          slowMo: process.env.REVIEW_HEADLESS === "true" ? 0 : Number(process.env.REVIEW_SLOWMO || 400),
+        },
+        video: "on",
+      },
+      dependencies: ["setup"],
+    },
+
+    // Machine-local projects (see playwright.local.js at the top of this file).
+    ...local.projects,
 
     // geo-login disabled: the BrightData proxy variables (BRIGHTDATA_HOST/PORT/
     // USERNAME/PASSWORD) are not defined in the Azure pipeline, so the .env on the

@@ -1,4 +1,4 @@
-import { Locator, Page } from '@playwright/test';
+import { expect, Locator, Page } from '@playwright/test';
 import BasePage from './BasePage';
 import { appUrl, PATHS } from '../config/environment';
 import {
@@ -26,6 +26,11 @@ export default class CouponsOffersPage extends BasePage {
   readonly expireDateNextMonthButton: Locator;
   readonly activeDateDialog: Locator;
   readonly expireDateDialog: Locator;
+  /**
+   * "Automatic Renewals → Set to Auto-Renew" is a custom pill (not a checkbox
+   * or switch): a div reading "No" or "Yes" that flips when clicked.
+   */
+  readonly autoRenewToggle: Locator;
 
   readonly nextButton: Locator;
   readonly saveButton: Locator;
@@ -45,7 +50,7 @@ export default class CouponsOffersPage extends BasePage {
   constructor(page: Page) {
     super(page);
 
-    this.programsMenuButton = page.getByRole('button', { name: ' Programs' });
+    this.programsMenuButton = page.getByRole('button', { name: ' Programs' });
     this.couponsOffersLink = page.getByRole('link', { name: 'Coupons & Offers' });
     this.programsFilterDropdown = page.getByRole('combobox', { name: 'Programs' });
     this.addCouponButton = page.getByRole('button', { name: 'Add Coupon or Offer' });
@@ -65,6 +70,10 @@ export default class CouponsOffersPage extends BasePage {
     this.expireDateDialog = page.getByRole('dialog', { name: 'Expire Date *' });
     this.activeDateNextMonthButton = this.activeDateDialog.getByLabel('Next month');
     this.expireDateNextMonthButton = this.expireDateDialog.getByLabel('Next month');
+    this.autoRenewToggle = page
+      .getByText('Set to Auto-Renew')
+      .locator('xpath=..')
+      .getByText(/^(Yes|No)$/);
 
     this.nextButton = page. getByRole('button', { name: 'Next', exact: true });
     this.saveButton = page.getByRole('button', { name: 'Save' });
@@ -90,9 +99,14 @@ export default class CouponsOffersPage extends BasePage {
     });
   }
 
+  /**
+   * The listing shows one program at a time (it opens on whichever program is
+   * first), so a coupon is only findable once its program is selected here.
+   */
   async filterByProgram(programName: string) {
     await this.programsFilterDropdown.first().click();
     await this.page.getByRole('option', { name: programName }).click();
+    await expect(this.programsFilterDropdown.first()).toHaveValue(programName);
   }
 
   async startAddCoupon() {
@@ -128,14 +142,41 @@ export default class CouponsOffersPage extends BasePage {
     await this.couponCodeInput.fill(couponCode);
   }
 
-  async selectActiveDate(dayOfMonth: string) {
-    await this.fillDateInput(this.activeDateInput, this.getNextMonthDate(dayOfMonth));
-    await this.fillTimeInput(this.activeTimeInput, '12:00 AM');
+  /**
+   * Set Active Date to `dayOfMonth` of next month and Active Time to `time`
+   * ("hh:mm AM"). Returns the mm/dd/yyyy date that was typed.
+   */
+  async selectActiveDate(dayOfMonth: string, time = '12:00 AM'): Promise<string> {
+    const date = this.getNextMonthDate(dayOfMonth);
+    await this.fillDateInput(this.activeDateInput, date);
+    await this.fillTimeInput(this.activeTimeInput, time);
+    return date;
   }
 
-  async selectExpireDate(dayOfMonth: string) {
-    await this.fillDateInput(this.expireDateInput, this.getNextMonthDate(dayOfMonth));
-    await this.fillTimeInput(this.expireTimeInput, '11:59 PM');
+  /** As selectActiveDate, for Expire Date / Expire Time. */
+  async selectExpireDate(dayOfMonth: string, time = '11:59 PM'): Promise<string> {
+    const date = this.getNextMonthDate(dayOfMonth);
+    await this.fillDateInput(this.expireDateInput, date);
+    await this.fillTimeInput(this.expireTimeInput, time);
+    return date;
+  }
+
+  /** "Yes" or "No", as the Set to Auto-Renew pill reads right now. */
+  async autoRenewState(): Promise<string> {
+    await expect(this.autoRenewToggle.first()).toBeVisible();
+    return (await this.autoRenewToggle.first().innerText()).trim();
+  }
+
+  /** Flip Set to Auto-Renew to Yes/No (no-op when already there) and confirm it. */
+  async setAutoRenew(enabled: boolean) {
+    const wanted = enabled ? 'Yes' : 'No';
+    if ((await this.autoRenewState()) !== wanted) {
+      await this.autoRenewToggle.first().click();
+    }
+    await expect(
+      this.autoRenewToggle.first(),
+      `Set to Auto-Renew did not switch to ${wanted}`,
+    ).toHaveText(wanted);
   }
 
   private async fillDateInput(input: Locator, value: string) {
@@ -145,9 +186,33 @@ export default class CouponsOffersPage extends BasePage {
     await input.press('Tab');
   }
 
+  /**
+   * The time fields are read-only MUI TimePickers: clicking one opens a
+   * "Select time" dialog with an analog clock that shows the hours view first
+   * and switches to minutes once an hour is chosen, plus AM/PM toggles and OK.
+   * The clock face is one hit-mask that maps the pointer angle to a value, so a
+   * number is chosen by clicking the face at that number's angle. The field's
+   * value is asserted afterwards, so a picker that did not take the time fails
+   * here rather than at save.
+   */
   private async fillTimeInput(input: Locator, value: string) {
+    const { hour, minute, ampm, formatted } = parseTime(value);
+    // Tabbing out of the date input can leave its calendar open over the field.
+    await this.page.keyboard.press('Escape').catch(() => {});
+    await input.scrollIntoViewIfNeeded();
     await input.click();
-    await this.page.getByRole('button', { name: 'OK' }).click();
+
+    const dialog = this.page
+      .getByRole('dialog')
+      .filter({ hasText: /Select time/i })
+      .last();
+    await expect(dialog, 'time picker did not open').toBeVisible({ timeout: 10_000 });
+    await clickClockFace(dialog, 'hours', (hour % 12) * 30);
+    await clickClockFace(dialog, 'minutes', minute * 6);
+    await dialog.getByRole('button', { name: ampm, exact: true }).click();
+    await dialog.getByRole('button', { name: /^OK$/i }).click();
+    await expect(dialog).toBeHidden({ timeout: 10_000 });
+    await expect(input, `time field did not take ${formatted}`).toHaveValue(formatted);
   }
 
   private async pickDateForNextMonth(
@@ -252,4 +317,89 @@ export default class CouponsOffersPage extends BasePage {
     await this.getCouponCard(title).getByRole('button', { name: 'Edit' }).click();
     await this.clickAndRefillDestinationURL(COUPON_DESTINATION_URL);
   }
+
+  /** Read the saved step-1 values of a coupon from its edit dialog. */
+  async readSavedCoupon(title: string): Promise<{
+    activeDate: string;
+    activeTime: string;
+    expireDate: string;
+    expireTime: string;
+    autoRenew: string;
+  }> {
+    await this.openEditForCoupon(title);
+    await expect(this.textLinkContentInput).toHaveValue(title, { timeout: 30_000 });
+    return {
+      activeDate: await this.activeDateInput.inputValue(),
+      activeTime: await this.activeTimeInput.inputValue(),
+      expireDate: await this.expireDateInput.inputValue(),
+      expireTime: await this.expireTimeInput.inputValue(),
+      autoRenew: await this.autoRenewState(),
+    };
+  }
+
+  /**
+   * Disable a coupon from its edit dialog (Edit → Next → Disable). The only
+   * removal the UI offers; a disabled coupon moves to the Disabled tab.
+   */
+  async disableCouponByTitle(title: string) {
+    await this.openEditForCoupon(title);
+    await this.goNext();
+    await expect(this.disableButton).toBeVisible({ timeout: 30_000 });
+    await this.disableCoupon();
+    await expect(this.alertMessage).toContainText(/successfully disabled/i, {
+      timeout: 30_000,
+    });
+  }
+}
+
+/** Split "h:mm AM" into parts and the zero-padded "hh:mm AM" the field shows. */
+function parseTime(value: string): {
+  hour: number;
+  minute: number;
+  ampm: 'AM' | 'PM';
+  formatted: string;
+} {
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(value.trim());
+  if (!m) throw new Error(`time "${value}" must look like "hh:mm AM"`);
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  if (hour < 1 || hour > 12 || minute > 59) {
+    throw new Error(`time "${value}" is not a valid 12-hour time`);
+  }
+  const ampm = m[3].toUpperCase() as 'AM' | 'PM';
+  return {
+    hour,
+    minute,
+    ampm,
+    formatted: `${String(hour).padStart(2, '0')}:${m[2]} ${ampm}`,
+  };
+}
+
+/**
+ * Click the MUI clock face at `degrees` clockwise from 12 o'clock. The numbers
+ * sit on a ring at ~42% of the face's width from its centre; the face itself
+ * (`.MuiClock-squareMask`) is the only element that takes pointer events and
+ * derives the value from the click angle. (Same picker as Add Campaign.)
+ */
+async function clickClockFace(dialog: Locator, view: 'hours' | 'minutes', degrees: number) {
+  // The listbox is labelled "Select hours. …" / "Select minutes. …", which is
+  // how the picker announces which view is showing. It has no box of its own
+  // (its numbers are absolutely positioned), so check attachment plus a
+  // visible number rather than the wrapper's visibility.
+  const listbox = dialog.locator(`[role="listbox"][aria-label^="Select ${view}"]`);
+  await expect(listbox, `time picker did not show the ${view} view`).toBeAttached({
+    timeout: 10_000,
+  });
+  await expect(listbox.getByRole('option').first()).toBeVisible({ timeout: 10_000 });
+  const face = dialog.locator('.MuiClock-squareMask');
+  const box = await face.boundingBox();
+  if (!box) throw new Error('time picker clock face is not rendered');
+  const radius = box.width * 0.42;
+  const rad = (degrees * Math.PI) / 180;
+  await face.click({
+    position: {
+      x: box.width / 2 + radius * Math.sin(rad),
+      y: box.height / 2 - radius * Math.cos(rad),
+    },
+  });
 }

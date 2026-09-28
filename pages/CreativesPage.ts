@@ -1,6 +1,14 @@
 import { Page, Locator, expect } from '@playwright/test';
 import BasePage from './BasePage';
 
+/** Step-2 targeting choices; values are the radio input values the app uses. */
+export type CreativeTargeting = 'Visible' | 'Invisible' | 'VisibleSelected';
+export const TARGETING_LABEL: Record<CreativeTargeting, string> = {
+    Visible: 'Visible to all publishers',
+    Invisible: 'Invisible to publishers',
+    VisibleSelected: 'Visible to selected publishers',
+};
+
 export default class CreativesPage extends BasePage {
 
     // ===== Locators =====
@@ -14,8 +22,15 @@ export default class CreativesPage extends BasePage {
     readonly campaignOption: (programName: string) => Locator;
 
     readonly textInput: Locator;
+    /** Step-1 "Text Link Content *" textarea (name="text"); 500-char limit enforced by the app. */
+    readonly textLinkContentInput: Locator;
+    readonly programNameInput: Locator;
+    readonly campaignNameInput: Locator;
     readonly nextBtn: Locator;
+    readonly backBtn: Locator;
     readonly saveBtn: Locator;
+    /** Step-2 targeting radios; present only once step 1 has validated. */
+    readonly targetingRadios: Locator;
 
     readonly createdTextLabel: Locator;
 
@@ -45,8 +60,13 @@ export default class CreativesPage extends BasePage {
             page.getByRole('option', { name: programName });
 
         this.textInput = page.getByRole('textbox').first();
+        this.textLinkContentInput = page.locator('textarea[name="text"]');
+        this.programNameInput = page.locator('input[name="programName"]');
+        this.campaignNameInput = page.locator('input[name="campaignName"]');
         this.nextBtn = page.getByRole('button', { name: 'Next' });
+        this.backBtn = page.getByRole('button', { name: /^Back$/i });
         this.saveBtn = page.getByRole('button', { name: 'Save' });
+        this.targetingRadios = page.locator('input[name="visiblityType"]');
 
         this.createdTextLabel = page.locator('body'); // can refine later
 
@@ -76,7 +96,7 @@ export default class CreativesPage extends BasePage {
     // toggle it shut) and retry until the campaign option appears, instead of
     // clicking blindly and timing out. This was the source of testAddTextLink
     // flaking on the slower CI agent.
-    private async selectProgramAndCampaign(programName: string) {
+    async selectProgramAndCampaign(programName: string) {
         await this.programDropdown.click();
         await this.programOption(programName).click();
 
@@ -91,7 +111,30 @@ export default class CreativesPage extends BasePage {
         await option.click();
     }
 
-    async createTextLink(programName: string, text: string) {
+    /**
+     * Helper text rendered under a step-1 field once validation runs
+     * (e.g. "This field is required." / "Maximum 500 characters allowed.").
+     * The field's MUI wrapper holds both the label and the helper <p>.
+     */
+    fieldHelperText(field: Locator): Locator {
+        return field.locator('xpath=ancestor::div[contains(@class,"MuiFormControl-root")][1]//p');
+    }
+
+    /** Targeting radio on step 2, by its rendered label. */
+    targetingOption(targeting: CreativeTargeting): Locator {
+        return this.page.getByRole('radio', { name: TARGETING_LABEL[targeting] });
+    }
+
+    /** Row in the "Visible to selected publishers" grid. */
+    publisherRow(publisherId: string | number): Locator {
+        return this.page.locator('tbody tr').filter({ hasText: String(publisherId) });
+    }
+
+    async createTextLink(
+        programName: string,
+        text: string,
+        options: { targeting?: CreativeTargeting; publisherIds?: Array<string | number> } = {},
+    ) {
         await this.addTextLinkBtn.click();
 
         await this.selectProgramAndCampaign(programName);
@@ -99,7 +142,26 @@ export default class CreativesPage extends BasePage {
         await this.textInput.fill(text);
 
         await this.nextBtn.click();
+
+        if (options.targeting) {
+            await this.targetingOption(options.targeting).check();
+            for (const id of options.publisherIds ?? []) {
+                await this.publisherRow(id).getByRole('checkbox').first().check();
+            }
+        }
         await this.saveBtn.click();
+    }
+
+    /**
+     * The listing is a card grid ("<text> / <program> | <campaign> / Creative: #id"),
+     * not a table. This is the smallest card element holding both the creative
+     * text and its "Creative: #" id line.
+     */
+    activeCreativeRow(text: string): Locator {
+        return this.page
+            .locator('div', { has: this.page.getByText(text, { exact: true }) })
+            .filter({ hasText: /Creative: #\d+/ })
+            .last();
     }
 
     // ===== Assertion Helper =====
